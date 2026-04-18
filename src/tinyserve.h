@@ -127,6 +127,14 @@ struct ts_client_s {
     /* per-connection read buffer, used by alloc_cb. Avoids malloc/free
      * churn on every uv_read_start cycle. */
     char read_buf[TS_READ_BUF_SIZE];
+    /* keep-alive idle timeout (armed between requests, disarmed on read). */
+    uv_timer_t idle_timer;
+    int idle_timer_initialized;
+    /* Close coordination: ts_client_close calls uv_close on every
+     * initialized handle (tcp + idle_timer [+ future read_timer]).
+     * close_pending counts outstanding uv_close callbacks; the client
+     * is freed (and g_conn_count decremented) when it hits 0. */
+    int close_pending;
 };
 
 /* ── Async file serving context ── */

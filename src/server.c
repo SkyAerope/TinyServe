@@ -36,20 +36,47 @@ static ts_client_t *client_alloc(void) {
     return client;
 }
 
-static void client_close_cb(uv_handle_t *handle) {
-    ts_client_t *client = handle->data;
-    if (client->file_ctx) {
-    atomic_fetch_sub(&g_conn_count, 1);
-        free(client->file_ctx->read_buf);
-        free(client->file_ctx);
-    }
+static void client_final_free(ts_client_t *client) {
     ts_request_free(&client->req);
     free(client);
+    atomic_fetch_sub(&g_conn_count, 1);
+}
+
+static void on_handle_closed(uv_handle_t *handle) {
+    ts_client_t *client = handle->data;
+    if (!client) return;
+    if (--client->close_pending == 0) {
+        client_final_free(client);
+    }
+}
+
+static void alloc_cb(uv_handle_t *handle, size_t suggested_size, uv_buf_t *buf);
+static void on_read(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf);
+static void dispatch_request(ts_client_t *client);
+
+static void on_idle_timeout(uv_timer_t *timer) {
+    ts_client_t *client = timer->data;
+    if (!client || client->closing) return;
+    ts_client_close(client);
+}
+
+static void idle_timer_start(ts_client_t *client) {
+    if (!client->idle_timer_initialized || client->closing) return;
+    int ms = client->config ? client->config->idle_timeout_ms
+                            : TS_DEFAULT_IDLE_TIMEOUT_MS;
+    if (ms <= 0) return;
+    uv_timer_start(&client->idle_timer, on_idle_timeout, (uint64_t)ms, 0);
+}
+
+static void idle_timer_stop(ts_client_t *client) {
+    if (!client->idle_timer_initialized) return;
+    uv_timer_stop(&client->idle_timer);
 }
 
 void ts_client_close(ts_client_t *client) {
     if (client->closing) return;
     client->closing = 1;
+
     /* Clean up any in-progress file context */
     if (client->file_ctx) {
         if (client->file_ctx->fd >= 0) {
@@ -61,14 +88,23 @@ void ts_client_close(ts_client_t *client) {
         free(client->file_ctx);
         client->file_ctx = NULL;
     }
+
+    client->close_pending = 0;
     if (!uv_is_closing((uv_handle_t *)&client->handle)) {
-        uv_close((uv_handle_t *)&client->handle, client_close_cb);
+        client->close_pending++;
+        uv_close((uv_handle_t *)&client->handle, on_handle_closed);
+    }
+    if (client->idle_timer_initialized &&
+        !uv_is_closing((uv_handle_t *)&client->idle_timer)) {
+        uv_timer_stop(&client->idle_timer);
+        client->close_pending++;
+        uv_close((uv_handle_t *)&client->idle_timer, on_handle_closed);
+    }
+    if (client->close_pending == 0) {
+        /* Nothing to close (should not happen in practice). */
+        client_final_free(client);
     }
 }
-
-static void alloc_cb(uv_handle_t *handle, size_t suggested_size, uv_buf_t *buf);
-static void on_read(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf);
-static void dispatch_request(ts_client_t *client);
 
 /* ── Called when pending_writes hits 0 and response_done is set ── */
 void ts_client_done(ts_client_t *client) {
@@ -102,6 +138,7 @@ void ts_client_done(ts_client_t *client) {
         }
 
         uv_read_start((uv_stream_t *)&client->handle, alloc_cb, on_read);
+        idle_timer_start(client);
     } else {
         ts_client_close(client);
     }
@@ -147,7 +184,10 @@ static void on_read(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf) {
     if (nread == 0) {
         return;
     }
+/* Activity on the connection: cancel the keep-alive idle deadline. */
+    idle_timer_stop(client);
 
+    
     int result = ts_request_parse(&client->req, buf->base, nread);
 
     if (result < 0) {
@@ -220,7 +260,12 @@ static void on_connection(uv_stream_t *server, int status) {
         return;
     }
 
+    uv_timer_init(loop, &client->idle_timer);
+    client->idle_timer.data = client;
+    client->idle_timer_initialized = 1;
+
     uv_read_start((uv_stream_t *)&client->handle, alloc_cb, on_read);
+    idle_timer_start(client);
 }
 
 static void on_signal(uv_signal_t *handle, int signum) {
