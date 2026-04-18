@@ -53,7 +53,8 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             cmake build-essential pkg-config libuv1-dev \
-            debhelper devscripts lintian fakeroot dh-make
+            debhelper devscripts lintian fakeroot dh-make \
+            systemd
 
       - name: dpkg-buildpackage
         run: dpkg-buildpackage -us -uc -b

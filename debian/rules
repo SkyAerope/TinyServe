@@ -13,8 +13,3 @@ override_dh_auto_test:
 	else \
 		dh_auto_test; \
 	fi
-
-override_dh_auto_install:
-	dh_auto_install
-	install -D -m 0644 debian/tinyserve.service \
-		debian/tinyserve/lib/systemd/system/tinyserve.service
