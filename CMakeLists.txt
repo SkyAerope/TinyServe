@@ -86,13 +86,44 @@ elseif(UNIX)
     target_link_libraries(tinyserve PRIVATE pthread dl)
 endif()
 
-install(TARGETS tinyserve RUNTIME DESTINATION bin)
+install(TARGETS tinyserve RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 
 # ── Install man page (gzip on Debian via dh; here keep raw) ────────────
 include(GNUInstallDirs)
 install(FILES man/tinyserve.1
     DESTINATION ${CMAKE_INSTALL_MANDIR}/man1
 )
+
+# ── Hardening (Release) ─────────────────────────────────────────────────
+# Enabled for Release builds (which is what Debian uses by default via
+# dh_auto_configure). Distributions that want different flags can pass
+# -DTS_NO_HARDENING=ON or override CFLAGS/LDFLAGS.
+#
+# The -Wl,-z,relro / -Wl,-z,now flags are GNU-ld specific and not
+# accepted by Apple's ld; restrict to Linux to keep the macOS dev
+# build green. macOS already enables ASLR / NX / stack-canaries by
+# default at the OS / toolchain level.
+if(NOT TS_NO_HARDENING)
+    if(CMAKE_BUILD_TYPE STREQUAL "Release" OR CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
+        target_compile_options(tinyserve PRIVATE
+            -D_FORTIFY_SOURCE=2
+            -fstack-protector-strong
+            -fPIE
+        )
+        if(UNIX AND NOT APPLE)
+            target_compile_options(tinyserve PRIVATE
+                -fstack-clash-protection
+            )
+            target_link_options(tinyserve PRIVATE
+                -pie
+                -Wl,-z,relro
+                -Wl,-z,now
+            )
+        else()
+            target_link_options(tinyserve PRIVATE -pie)
+        endif()
+    endif()
+endif()
 
 # ── Tests ────────────────────────────────────────────────────────────────
 enable_testing()
