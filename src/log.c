@@ -25,13 +25,25 @@ void ts_log(int level, const char *fmt, ...) {
     struct tm tm_buf;
     localtime_r(&now, &tm_buf);
 
-    fprintf(stderr, "[%02d:%02d:%02d] [%s] ",
-            tm_buf.tm_hour, tm_buf.tm_min, tm_buf.tm_sec, prefix);
-
+    /* Format the user message into a private buffer first so we can
+     * sanitize control bytes \u2014 prevents log-injection where an
+     * attacker-supplied path contains "\r\n[INFO] FAKE LINE". */
+    char msg[2048];
     va_list ap;
     va_start(ap, fmt);
-    vfprintf(stderr, fmt, ap);
+    int n = vsnprintf(msg, sizeof(msg), fmt, ap);
     va_end(ap);
+    if (n < 0) { msg[0] = '\0'; n = 0; }
+    if ((size_t)n >= sizeof(msg)) n = (int)sizeof(msg) - 1;
 
-    fputc('\n', stderr);
+    for (int i = 0; i < n; i++) {
+        unsigned char c = (unsigned char)msg[i];
+        /* Allow tab; replace every other C0 control byte (incl. CR/LF)
+         * and DEL with '.'. Leaves UTF-8 bytes (>= 0x80) untouched. */
+        if (c == '\t') continue;
+        if (c < 0x20 || c == 0x7f) msg[i] = '.';
+    }
+
+    fprintf(stderr, "[%02d:%02d:%02d] [%s] %s\n",
+            tm_buf.tm_hour, tm_buf.tm_min, tm_buf.tm_sec, prefix, msg);
 }

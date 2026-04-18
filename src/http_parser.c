@@ -160,6 +160,23 @@ int ts_request_parse(ts_request_t *req, const char *data, size_t len)
             LOG_ERROR("http_parser: path too long or empty");
             return -1;
         }
+        /* Reject embedded NUL bytes in the request-target. A literal NUL
+         * mid-path would let downstream string handling truncate and
+         * resolve a different file than the one logged. */
+        if (memchr(path_start, '\0', raw_path_len) != NULL) {
+            LOG_ERROR("http_parser: NUL byte in request-target");
+            return -1;
+        }
+        /* Reject CR/LF in the request-target as well \u2014 they only get
+         * here if the upstream split request line was odd, but it's
+         * cheap insurance against log/header injection. */
+        for (size_t i = 0; i < raw_path_len; i++) {
+            unsigned char c = (unsigned char)path_start[i];
+            if (c == '\r' || c == '\n') {
+                LOG_ERROR("http_parser: CR/LF in request-target");
+                return -1;
+            }
+        }
         memcpy(req->raw_path, path_start, raw_path_len);
         req->raw_path[raw_path_len] = '\0';
 

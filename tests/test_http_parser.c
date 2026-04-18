@@ -109,7 +109,17 @@ static void test_invalid_header_name_rejected(void) {
     ts_request_free(&req);
 }
 
+static void test_nul_in_path_rejected(void) {
+    ts_request_t req; ts_request_init(&req);
+    /* Embedded NUL byte in the request-target. */
+    const char m[] = "GET /a\0b HTTP/1.1\r\nHost: x\r\n\r\n";
+    int rc = ts_request_parse(&req, m, sizeof(m) - 1);
+    assert(rc == -1);
+    ts_request_free(&req);
+}
+
 int main(void) {
+    test_nul_in_path_rejected();
     test_simple_get();
     test_header_case_insensitive();
     test_two_chunk_delivery();
