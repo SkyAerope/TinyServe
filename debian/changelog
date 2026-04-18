@@ -1,6 +1,6 @@
 tinyserve (0.3.0-1) unstable; urgency=medium
 
-  * Initial release.
+  * Initial release. (Closes: #XXXXXX)
     - Multi-worker HTTP/1.1 server on libuv with SO_REUSEPORT.
     - Static file serving with byte-range, ETag, Last-Modified, 304.
     - Asynchronous directory listings via uv_queue_work.

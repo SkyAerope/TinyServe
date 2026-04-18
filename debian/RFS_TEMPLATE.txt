@@ -1,0 +1,47 @@
+From: Derrity <derrity0731@proton.me>
+To: debian-mentors@lists.debian.org
+Subject: RFS: tinyserve/0.3.0-1 [ITP] -- minimal multi-worker HTTP server built on libuv
+
+Dear mentors,
+
+I am looking for a sponsor for my package "tinyserve":
+
+ * Package name     : tinyserve
+   Version          : 0.3.0-1
+   Upstream contact : Derrity <derrity0731@proton.me>
+ * URL              : https://github.com/Derrity/TinyServe
+ * License          : MIT (Expat)
+   Section          : web
+
+The source builds the binary package:
+
+  tinyserve - minimal multi-worker HTTP server built on libuv
+
+To access further information about this package, please visit
+the following URL:
+
+  https://mentors.debian.net/package/tinyserve/
+
+Alternatively, you can download the package with dget using this command:
+
+  dget -x https://mentors.debian.net/debian/pool/main/t/tinyserve/tinyserve_0.3.0-1.dsc
+
+Salsa: https://salsa.debian.org/<your-salsa-username>/tinyserve
+
+Changes since the last upload (this is the first upload):
+
+ tinyserve (0.3.0-1) unstable; urgency=medium
+
+   * Initial release. (Closes: #XXXXXX)
+
+QA status:
+ * lintian -EvIL +pedantic --pedantic on .changes: clean
+   (only the expected initial-upload-closes-no-bugs is shown).
+ * piuparts -d unstable: clean install / upgrade / purge.
+ * autopkgtest -- null: smoke test passes.
+ * sbuild -d unstable: rebuilds cleanly in a fresh sid chroot.
+ * blhc: all hardening flags active.
+ * Reproducible build: yes (tested with reprotest --vary=+all).
+
+Best regards,
+Derrity

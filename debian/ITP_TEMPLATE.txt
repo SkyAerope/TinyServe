@@ -1,0 +1,48 @@
+From: Derrity <derrity0731@proton.me>
+To: submit@bugs.debian.org
+Subject: ITP: tinyserve -- minimal multi-worker HTTP server built on libuv
+
+Package: wnpp
+Severity: wishlist
+Owner: Derrity <derrity0731@proton.me>
+X-Debbugs-Cc: debian-devel@lists.debian.org
+
+* Package name    : tinyserve
+  Version         : 0.3.0
+  Upstream Author : Derrity <derrity0731@proton.me>
+* URL             : https://github.com/Derrity/TinyServe
+* License         : MIT (Expat)
+  Programming Lang: C
+  Description     : minimal multi-worker HTTP server built on libuv
+
+TinyServe is a small static-file and reverse-proxy HTTP/1.1 server
+written in C on top of libuv. Notable features:
+
+  * Multi-worker model via fork() + SO_REUSEPORT (Linux) or a
+    single-process fast path elsewhere.
+  * Static file serving with byte-range requests, ETag and
+    Last-Modified validation, 304 Not Modified.
+  * Asynchronous directory listings (uv_queue_work).
+  * Basic-auth, reverse proxy, and a JSON-driven route table.
+  * Hardened HTTP parser (rejects CL+TE smuggling, non-tchar
+    header names, NUL/CRLF in the request-target) plus
+    log-injection sanitisation.
+  * Per-connection idle and request timeouts; SOMAXCONN backlog;
+    bounded concurrent connections (503 on excess).
+  * Hardened Release build: PIE, RELRO, BIND_NOW,
+    _FORTIFY_SOURCE=2, -fstack-protector-strong, stack-clash
+    protection (Linux).
+  * Cryptographically strong multipart-range boundaries
+    (getrandom() / arc4random_buf / /dev/urandom).
+  * Unit-test suite under CTest; man page tinyserve(1).
+
+Why does Debian want it?
+  Existing static-file servers in the archive (lighttpd, nginx,
+  apache2, busybox-httpd, webfs) are either heavyweight, lack
+  hardening defaults, or are not multi-worker. TinyServe fills
+  the niche of a sub-100KB, hardening-by-default, libuv-based
+  single-binary HTTP server suitable for kiosks, embedded
+  appliances, CI artefact servers, and quick file dumps.
+
+I plan to maintain this package myself and look for a sponsor to
+upload it.

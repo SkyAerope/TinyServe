@@ -1,0 +1,17 @@
+# Salsa-CI configuration for TinyServe.
+# Runs the standard Debian packaging CI pipeline against every push
+# to a salsa.debian.org-hosted clone of this repository.
+#
+# Docs: https://salsa.debian.org/salsa-ci-team/pipeline
+
+include:
+  - https://salsa.debian.org/salsa-ci-team/pipeline/raw/master/salsa-ci.yml
+  - https://salsa.debian.org/salsa-ci-team/pipeline/raw/master/pipeline-jobs.yml
+
+variables:
+  RELEASE: 'unstable'
+  SALSA_CI_DISABLE_REPROTEST: 0
+  SALSA_CI_DISABLE_LINTIAN: 0
+  SALSA_CI_DISABLE_PIUPARTS: 0
+  SALSA_CI_DISABLE_BLHC: 0
+  SALSA_CI_LINTIAN_OPTS: '-EvIL +pedantic'

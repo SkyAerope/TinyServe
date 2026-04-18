@@ -7,6 +7,43 @@ Files: *
 Copyright: 2026 Derrity <derrity0731@proton.me>
 License: MIT
 
+Files: src/*
+Copyright: 2026 Derrity <derrity0731@proton.me>
+License: MIT
+Comment:
+ All C source and header files under src/ are original work of the
+ upstream author and carry an SPDX-License-Identifier: MIT marker
+ in their header.
+
+Files: tests/*
+Copyright: 2026 Derrity <derrity0731@proton.me>
+License: MIT
+
+Files: man/*
+Copyright: 2026 Derrity <derrity0731@proton.me>
+License: MIT
+
+Files: scripts/*
+Copyright: 2026 Derrity <derrity0731@proton.me>
+License: MIT
+
+Files: CMakeLists.txt
+       tests/CMakeLists.txt
+       xmake.lua
+Copyright: 2026 Derrity <derrity0731@proton.me>
+License: MIT
+
+Files: README.md
+       README_CN.md
+       CHANGELOG.md
+Copyright: 2026 Derrity <derrity0731@proton.me>
+License: MIT
+
+Files: .github/*
+       .gitignore
+Copyright: 2026 Derrity <derrity0731@proton.me>
+License: MIT
+
 Files: debian/*
 Copyright: 2026 Derrity <derrity0731@proton.me>
 License: MIT
