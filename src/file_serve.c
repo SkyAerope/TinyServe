@@ -15,7 +15,10 @@
 #include <unistd.h>
 #include <errno.h>
 
-/* Write request that tracks its owning file context for chained reads. */
+/* Write request that tracks its owning file context for chained reads.
+ * The buffer aliases fctx->read_buf directly (zero-copy): the next read
+ * is not issued until on_file_chunk_written fires, so the two uses of
+ * the buffer cannot overlap. */
 typedef struct {
     uv_write_t req;
     uv_buf_t   buf;
@@ -68,7 +71,7 @@ static void on_file_chunk_written(uv_write_t *req, int status) {
     ts_file_ctx_t *fctx = fwr->fctx;
     ts_client_t *client = fctx->client;
 
-    free(fwr->buf.base);
+    /* Zero-copy: fwr->buf.base aliases fctx->read_buf, do NOT free it. */
     free(fwr);
 
     /* Decrement pending write counter */
@@ -114,15 +117,9 @@ static void on_file_read(uv_fs_t *req) {
         file_start_close(fctx);
         return;
     }
-    fwr->buf.base = malloc((size_t)nread);
-    if (!fwr->buf.base) {
-        free(fwr);
-        fctx->client->req.keep_alive = 0;
-        file_start_close(fctx);
-        return;
-    }
-    memcpy(fwr->buf.base, fctx->read_buf, (size_t)nread);
-    fwr->buf.len = (size_t)nread;
+    /* Zero-copy: send directly from the read buffer. Safe because the
+     * next uv_fs_read is not issued until on_file_chunk_written runs. */
+    fwr->buf = uv_buf_init(fctx->read_buf, (unsigned int)nread);
     fwr->fctx = fctx;
 
     /* Track this write */
