@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-License-Identifier: MIT -->
+<!-- Copyright (c) 2026 Derrity -->
+<component type="console-application">
+  <id>io.github.derrity.tinyserve</id>
+  <name>TinyServe</name>
+  <summary>Tiny multi-worker HTTP server built on libuv</summary>
+  <metadata_license>MIT</metadata_license>
+  <project_license>MIT</project_license>
+  <description>
+    <p>
+      TinyServe is a small static-file and reverse-proxy HTTP/1.1 server
+      written in C on top of libuv. It supports a SO_REUSEPORT-based
+      multi-worker model, byte-range requests, ETag/Last-Modified
+      caching, asynchronous directory listings, basic authentication,
+      and a JSON-driven route table.
+    </p>
+    <p>
+      The package ships an optional systemd service that runs the
+      server under a dynamically allocated unprivileged user with a
+      hardened sandbox (DynamicUser, ProtectSystem=strict,
+      NoNewPrivileges, MemoryDenyWriteExecute, a syscall allow-list,
+      and a read-only document root).
+    </p>
+  </description>
+  <url type="homepage">https://github.com/Derrity/TinyServe</url>
+  <url type="bugtracker">https://github.com/Derrity/TinyServe/issues</url>
+  <provides>
+    <binary>tinyserve</binary>
+  </provides>
+  <categories>
+    <category>Network</category>
+    <category>WebServer</category>
+  </categories>
+  <developer_name>Derrity</developer_name>
+  <releases>
+    <release version="0.3.0" date="2026-01-23"/>
+    <release version="0.1.0" date="2025-11-15"/>
+  </releases>
+  <content_rating type="oars-1.1"/>
+</component>

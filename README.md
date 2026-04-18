@@ -298,6 +298,51 @@ src/
 └── log.h/c            # Logging with levels
 ```
 
+## Security
+
+TinyServe enforces several layers of defence against common HTTP server
+attacks. All of the following are covered by unit tests under
+`tests/` (run with `ctest --test-dir build`):
+
+- **Path traversal & symlink escape**: every request path is URL-decoded,
+  normalized, and `realpath(3)`-validated against the document root
+  prefix.
+- **NUL / CRLF injection**: request-targets containing literal `\0`,
+  `\r`, or `\n` are rejected with 400.
+- **HTTP request smuggling**: requests carrying both `Content-Length`
+  and `Transfer-Encoding` (the canonical CL.TE / TE.CL vector) are
+  rejected with 400.
+- **Header field-name validation**: only the RFC 7230 §3.2.6 *tchar*
+  set is accepted; everything else is 400.
+- **Log injection**: control bytes in formatted log output are
+  replaced with `.` before writing to stderr.
+- **Resource exhaustion**: bounded concurrent connections (503 on
+  excess), idle keep-alive timeout, request read timeout,
+  431 on oversized headers, async directory listings via the
+  libuv worker pool.
+- **Hardened binary**: `Release` builds enable
+  `-D_FORTIFY_SOURCE=2 -fstack-protector-strong -fPIE` and link with
+  `-pie -Wl,-z,relro -Wl,-z,now` on Linux.
+
+## Install (Debian / Ubuntu)
+
+```bash
+sudo apt-get install -y cmake build-essential pkg-config libuv1-dev \
+                        debhelper devscripts fakeroot
+dpkg-buildpackage -us -uc -b
+sudo dpkg -i ../tinyserve_*.deb
+sudo systemctl enable --now tinyserve
+```
+
+The `.deb` ships a hardened systemd unit
+(`/lib/systemd/system/tinyserve.service`) running under `DynamicUser`
+with `ProtectSystem=strict`, `NoNewPrivileges`, `MemoryDenyWriteExecute`,
+a syscall allow-list, and a read-only `/var/www/tinyserve` document
+root.
+
 ## License
 
-MIT
+MIT — see [LICENSE](LICENSE) for the full text.
+
+Copyright (c) 2026 Derrity.
+
