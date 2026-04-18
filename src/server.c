@@ -238,7 +238,7 @@ int ts_server_start(ts_config_t *cfg) {
         return -1;
     }
 
-    r = uv_listen((uv_stream_t *)&server_handle, 128, on_connection);
+    r = uv_listen((uv_stream_t *)&server_handle, TS_DEFAULT_BACKLOG, on_connection);
     if (r != 0) {
         LOG_ERROR("listen error: %s", uv_strerror(r));
         return -1;
