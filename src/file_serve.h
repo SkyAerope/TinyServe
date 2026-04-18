@@ -1,3 +1,5 @@
+/* SPDX-License-Identifier: MIT */
+/* Copyright (c) 2026 Derrity */
 #ifndef TS_FILE_SERVE_H
 #define TS_FILE_SERVE_H
 

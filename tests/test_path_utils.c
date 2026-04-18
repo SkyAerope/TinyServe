@@ -1,3 +1,5 @@
+/* SPDX-License-Identifier: MIT */
+/* Copyright (c) 2026 Derrity */
 /* Unit tests for ts_path_resolve / ts_url_decode.
  * Validates URL decoding rejection of NUL bytes, traversal protection,
  * normalization of redundant separators and dot-segments. */

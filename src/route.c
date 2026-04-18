@@ -1,3 +1,5 @@
+/* SPDX-License-Identifier: MIT */
+/* Copyright (c) 2026 Derrity */
 #include "route.h"
 #include "http_parser.h"
 #include "http_response.h"

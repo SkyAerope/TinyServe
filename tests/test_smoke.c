@@ -1,3 +1,5 @@
+/* SPDX-License-Identifier: MIT */
+/* Copyright (c) 2026 Derrity */
 /* Smoke test: verifies the CTest harness itself works. */
 #include <assert.h>
 #include <stdio.h>

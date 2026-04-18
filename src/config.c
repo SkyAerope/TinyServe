@@ -1,3 +1,5 @@
+/* SPDX-License-Identifier: MIT */
+/* Copyright (c) 2026 Derrity */
 #include "config.h"
 #include "log.h"
 #include <stdio.h>

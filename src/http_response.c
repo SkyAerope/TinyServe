@@ -1,3 +1,5 @@
+/* SPDX-License-Identifier: MIT */
+/* Copyright (c) 2026 Derrity */
 #include "http_response.h"
 #include "server.h"
 #include "log.h"

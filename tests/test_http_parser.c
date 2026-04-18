@@ -1,3 +1,5 @@
+/* SPDX-License-Identifier: MIT */
+/* Copyright (c) 2026 Derrity */
 /* Unit tests for the streaming HTTP request parser. */
 #define _POSIX_C_SOURCE 200809L
 #include "http_parser.h"

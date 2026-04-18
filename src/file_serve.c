@@ -1,3 +1,5 @@
+/* SPDX-License-Identifier: MIT */
+/* Copyright (c) 2026 Derrity */
 #define _XOPEN_SOURCE 700  /* strptime, timegm */
 #define _DEFAULT_SOURCE    /* timegm on glibc */
 #include "file_serve.h"

@@ -1,3 +1,5 @@
+/* SPDX-License-Identifier: MIT */
+/* Copyright (c) 2026 Derrity */
 #include "auth.h"
 #include "http_parser.h"
 #include "log.h"

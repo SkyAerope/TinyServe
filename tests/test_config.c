@@ -1,3 +1,5 @@
+/* SPDX-License-Identifier: MIT */
+/* Copyright (c) 2026 Derrity */
 /* Unit tests for src/config.c */
 #include "config.h"
 #include "tinyserve.h"

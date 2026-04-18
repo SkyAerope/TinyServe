@@ -1,3 +1,5 @@
+/* SPDX-License-Identifier: MIT */
+/* Copyright (c) 2026 Derrity */
 #include "tinyserve.h"
 #include "config.h"
 #include "server.h"

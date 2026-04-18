@@ -1,3 +1,5 @@
+/* SPDX-License-Identifier: MIT */
+/* Copyright (c) 2026 Derrity */
 /* Unit tests for ts_range_parse / ts_range_boundary. */
 #define _POSIX_C_SOURCE 200809L
 #include "range.h"
