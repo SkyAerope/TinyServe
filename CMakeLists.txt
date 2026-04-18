@@ -75,3 +75,7 @@ elseif(UNIX)
 endif()
 
 install(TARGETS tinyserve RUNTIME DESTINATION bin)
+
+# ── Tests ────────────────────────────────────────────────────────────────
+enable_testing()
+add_subdirectory(tests)
