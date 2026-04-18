@@ -155,6 +155,9 @@ struct ts_file_ctx_s {
     char *read_buf;           /* TS_SEND_BUF_SIZE, heap-allocated */
     uv_file fd;
     int64_t file_size;
+    time_t  mtime;            /* last modified, seconds since epoch */
+    char    etag[64];
+    char    last_mod[64];     /* RFC 1123 GMT */
     int64_t offset;           /* current read position */
     int64_t remaining;        /* bytes left in current range */
     /* range state */

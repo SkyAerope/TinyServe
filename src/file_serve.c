@@ -1,3 +1,5 @@
+#define _XOPEN_SOURCE 700  /* strptime, timegm */
+#define _DEFAULT_SOURCE    /* timegm on glibc */
 #include "file_serve.h"
 #include "http_parser.h"
 #include "http_response.h"
@@ -14,6 +16,12 @@
 #include <dirent.h>
 #include <unistd.h>
 #include <errno.h>
+#include <time.h>
+
+/* timegm is non-POSIX (BSD/glibc extension). Both macOS and glibc have
+ * it, but glibc requires _DEFAULT_SOURCE and macOS hides it behind
+ * _DARWIN_C_SOURCE. Forward-declare to avoid feature-test rabbit holes. */
+extern time_t timegm(struct tm *);
 
 /* Write request that tracks its owning file context for chained reads.
  * The buffer aliases fctx->read_buf directly (zero-copy): the next read
@@ -208,9 +216,12 @@ static void on_file_open(uv_fs_t *req) {
 
     if (!range_hdr) {
         /* Full file — 200 */
+        char extra[256];
+        snprintf(extra, sizeof(extra),
+                 "Accept-Ranges: bytes\r\nETag: %s\r\nLast-Modified: %s\r\n",
+                 fctx->etag, fctx->last_mod);
         ts_response_send_headers(client, 200, fctx->mime,
-                                 fctx->file_size,
-                                 "Accept-Ranges: bytes\r\n");
+                                 fctx->file_size, extra);
         fctx->offset    = 0;
         fctx->remaining = fctx->file_size;
         fctx->range_count = 0;
@@ -221,9 +232,12 @@ static void on_file_open(uv_fs_t *req) {
 
         if (rc == -1) {
             /* Malformed range — serve full file */
+            char extra[256];
+            snprintf(extra, sizeof(extra),
+                     "Accept-Ranges: bytes\r\nETag: %s\r\nLast-Modified: %s\r\n",
+                     fctx->etag, fctx->last_mod);
             ts_response_send_headers(client, 200, fctx->mime,
-                                     fctx->file_size,
-                                     "Accept-Ranges: bytes\r\n");
+                                     fctx->file_size, extra);
             fctx->offset    = 0;
             fctx->remaining = fctx->file_size;
             fctx->range_count = 0;
@@ -505,8 +519,59 @@ static void send_directory_listing(ts_client_t *client, const char *fs_path,
 
 /* ── Begin async file serving (allocate context, open file) ── */
 static void serve_file_async(ts_client_t *client, const char *fs_path,
-                             int64_t file_size) {
+                             int64_t file_size, time_t mtime) {
     int is_head = (strcmp(client->req.method, "HEAD") == 0);
+
+    /* Build a strong-ish validator: "size-mtime" in hex.
+     * mtime has 1-second granularity, which is acceptable for static
+     * file serving (same as nginx's default). */
+    char etag[64];
+    snprintf(etag, sizeof(etag), "\"%llx-%llx\"",
+             (unsigned long long)file_size,
+             (unsigned long long)mtime);
+
+    /* Last-Modified in RFC 1123 / GMT */
+    char last_mod[64];
+    {
+        struct tm tm;
+        gmtime_r(&mtime, &tm);
+        strftime(last_mod, sizeof(last_mod),
+                 "%a, %d %b %Y %H:%M:%S GMT", &tm);
+    }
+
+    /* Conditional GET: If-None-Match wins over If-Modified-Since per
+     * RFC 7232 §6. Both are honoured for GET and HEAD only. */
+    if (strcmp(client->req.method, "GET") == 0 || is_head) {
+        const char *inm = ts_request_header(&client->req, "If-None-Match");
+        const char *ims = ts_request_header(&client->req, "If-Modified-Since");
+        int not_modified = 0;
+
+        if (inm) {
+            /* Match either the ETag or the wildcard "*". */
+            if (strcmp(inm, "*") == 0 || strstr(inm, etag) != NULL)
+                not_modified = 1;
+        } else if (ims) {
+            /* Compare HTTP-date second-precision. We accept the
+             * client's date if our mtime is <= it. */
+            struct tm itm;
+            memset(&itm, 0, sizeof(itm));
+            if (strptime(ims, "%a, %d %b %Y %H:%M:%S GMT", &itm)) {
+                time_t ims_t = timegm(&itm);
+                if (ims_t >= mtime)
+                    not_modified = 1;
+            }
+        }
+
+        if (not_modified) {
+            char extra[256];
+            snprintf(extra, sizeof(extra),
+                     "ETag: %s\r\nLast-Modified: %s\r\n",
+                     etag, last_mod);
+            ts_response_send(client, 304, ts_mime_type(fs_path),
+                             "", 0, extra, is_head);
+            return;
+        }
+    }
 
     ts_file_ctx_t *fctx = calloc(1, sizeof(*fctx));
     if (!fctx) {
@@ -517,7 +582,10 @@ static void serve_file_async(ts_client_t *client, const char *fs_path,
     fctx->client    = client;
     fctx->fd        = -1;
     fctx->file_size = file_size;
+    fctx->mtime     = mtime;
     fctx->is_head   = is_head;
+    snprintf(fctx->etag,     sizeof(fctx->etag),     "%s", etag);
+    snprintf(fctx->last_mod, sizeof(fctx->last_mod), "%s", last_mod);
     snprintf(fctx->mime, sizeof(fctx->mime), "%s", ts_mime_type(fs_path));
 
     fctx->read_buf = malloc(TS_SEND_BUF_SIZE);
@@ -601,12 +669,13 @@ void ts_file_serve(ts_client_t *client) {
 
         struct stat idx_st;
         if (stat(index_path, &idx_st) == 0 && S_ISREG(idx_st.st_mode)) {
-            serve_file_async(client, index_path, idx_st.st_size);
+            serve_file_async(client, index_path, idx_st.st_size,
+                             idx_st.st_mtime);
         } else {
             send_directory_listing(client, fs_path, req->path);
         }
     } else if (S_ISREG(st.st_mode)) {
-        serve_file_async(client, fs_path, st.st_size);
+        serve_file_async(client, fs_path, st.st_size, st.st_mtime);
     } else {
         ts_response_send_404(client, is_head);
     }
