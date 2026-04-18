@@ -112,10 +112,10 @@ void ts_client_response_end(ts_client_t *client) {
 }
 
 static void alloc_cb(uv_handle_t *handle, size_t suggested_size, uv_buf_t *buf) {
-    (void)handle;
     (void)suggested_size;
-    buf->base = malloc(TS_READ_BUF_SIZE);
-    buf->len = buf->base ? TS_READ_BUF_SIZE : 0;
+    ts_client_t *client = handle->data;
+    buf->base = client->read_buf;
+    buf->len  = sizeof(client->read_buf);
 }
 
 /* Dispatch a fully-parsed request to the appropriate handler */
@@ -134,18 +134,15 @@ static void on_read(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf) {
     ts_client_t *client = stream->data;
 
     if (nread < 0) {
-        if (buf->base) free(buf->base);
         ts_client_close(client);
         return;
     }
 
     if (nread == 0) {
-        if (buf->base) free(buf->base);
         return;
     }
 
     int result = ts_request_parse(&client->req, buf->base, nread);
-    free(buf->base);
 
     if (result < 0) {
         /* Parse error — send 400 and close.

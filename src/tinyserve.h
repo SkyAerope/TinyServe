@@ -124,6 +124,9 @@ struct ts_client_s {
      * pending_writes reaches 0 AND response_done is set. */
     int pending_writes;
     int response_done;
+    /* per-connection read buffer, used by alloc_cb. Avoids malloc/free
+     * churn on every uv_read_start cycle. */
+    char read_buf[TS_READ_BUF_SIZE];
 };
 
 /* ── Async file serving context ── */
