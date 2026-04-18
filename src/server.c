@@ -60,6 +60,15 @@ static void on_idle_timeout(uv_timer_t *timer) {
     ts_client_close(client);
 }
 
+static void on_read_timeout(uv_timer_t *timer) {
+    ts_client_t *client = timer->data;
+    if (!client || client->closing) return;
+    /* Partial request: send 408 if possible, then close. */
+    client->req.keep_alive = 0;
+    ts_response_send(client, 408, "text/plain",
+                     "Request Timeout", 15, NULL, 0);
+}
+
 static void idle_timer_start(ts_client_t *client) {
     if (!client->idle_timer_initialized || client->closing) return;
     int ms = client->config ? client->config->idle_timeout_ms
@@ -71,6 +80,22 @@ static void idle_timer_start(ts_client_t *client) {
 static void idle_timer_stop(ts_client_t *client) {
     if (!client->idle_timer_initialized) return;
     uv_timer_stop(&client->idle_timer);
+}
+
+static void read_timer_start(ts_client_t *client) {
+    if (!client->read_timer_initialized || client->closing) return;
+    if (client->read_timer_active) return;
+    int ms = client->config ? client->config->read_timeout_ms
+                            : TS_DEFAULT_READ_TIMEOUT_MS;
+    if (ms <= 0) return;
+    uv_timer_start(&client->read_timer, on_read_timeout, (uint64_t)ms, 0);
+    client->read_timer_active = 1;
+}
+
+static void read_timer_stop(ts_client_t *client) {
+    if (!client->read_timer_initialized) return;
+    uv_timer_stop(&client->read_timer);
+    client->read_timer_active = 0;
 }
 
 void ts_client_close(ts_client_t *client) {
@@ -99,6 +124,13 @@ void ts_client_close(ts_client_t *client) {
         uv_timer_stop(&client->idle_timer);
         client->close_pending++;
         uv_close((uv_handle_t *)&client->idle_timer, on_handle_closed);
+    }
+    if (client->read_timer_initialized &&
+        !uv_is_closing((uv_handle_t *)&client->read_timer)) {
+        uv_timer_stop(&client->read_timer);
+        client->read_timer_active = 0;
+        client->close_pending++;
+        uv_close((uv_handle_t *)&client->read_timer, on_handle_closed);
     }
     if (client->close_pending == 0) {
         /* Nothing to close (should not happen in practice). */
@@ -184,10 +216,11 @@ static void on_read(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf) {
     if (nread == 0) {
         return;
     }
-/* Activity on the connection: cancel the keep-alive idle deadline. */
+/* Activity on the connection: cancel the keep-alive idle deadline
+     * and start the request read deadline for this request's bytes. */
     idle_timer_stop(client);
+    read_timer_start(client);
 
-    
     int result = ts_request_parse(&client->req, buf->base, nread);
 
     if (result < 0) {
@@ -204,6 +237,7 @@ static void on_read(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf) {
     }
 
     LOG_INFO("%s %s", client->req.method, client->req.raw_path);
+    read_timer_stop(client);
     dispatch_request(client);
 }
 
@@ -263,6 +297,10 @@ static void on_connection(uv_stream_t *server, int status) {
     uv_timer_init(loop, &client->idle_timer);
     client->idle_timer.data = client;
     client->idle_timer_initialized = 1;
+
+    uv_timer_init(loop, &client->read_timer);
+    client->read_timer.data = client;
+    client->read_timer_initialized = 1;
 
     uv_read_start((uv_stream_t *)&client->handle, alloc_cb, on_read);
     idle_timer_start(client);

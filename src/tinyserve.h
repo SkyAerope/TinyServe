@@ -130,6 +130,11 @@ struct ts_client_s {
     /* keep-alive idle timeout (armed between requests, disarmed on read). */
     uv_timer_t idle_timer;
     int idle_timer_initialized;
+    /* request read timeout (armed while a request is in-flight, disarmed
+     * once the request line + headers are fully parsed). */
+    uv_timer_t read_timer;
+    int read_timer_initialized;
+    int read_timer_active;
     /* Close coordination: ts_client_close calls uv_close on every
      * initialized handle (tcp + idle_timer [+ future read_timer]).
      * close_pending counts outstanding uv_close callbacks; the client
