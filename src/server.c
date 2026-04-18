@@ -227,6 +227,14 @@ static void on_read(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf) {
 
     int result = ts_request_parse(&client->req, buf->base, nread);
 
+    if (result == -2) {
+        /* Header section exceeded TS_MAX_HEADER_SIZE — RFC 6585 §5. */
+        client->req.keep_alive = 0;
+        ts_response_send(client, 431, "text/plain",
+                         "Request Header Fields Too Large", 31, NULL, 0);
+        return;
+    }
+
     if (result < 0) {
         /* Parse error — send 400 and close.
          * ts_response_send sets response_done; keep_alive=0 ensures close. */

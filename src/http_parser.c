@@ -114,7 +114,7 @@ int ts_request_parse(ts_request_t *req, const char *data, size_t len)
     /* Enforce total header size limit (before headers are complete) */
     if (!req->headers_complete && req->buf_len > TS_MAX_HEADER_SIZE) {
         LOG_ERROR("http_parser: headers too large (%zu bytes)", req->buf_len);
-        return -1;
+        return -2;  /* distinct code so caller can send 431 */
     }
 
     size_t pos = req->parse_pos; /* resume from where we left off */

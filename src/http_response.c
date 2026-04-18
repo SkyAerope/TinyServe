@@ -43,7 +43,9 @@ const char *ts_status_text(int status)
     case 403: return "Forbidden";
     case 404: return "Not Found";
     case 405: return "Method Not Allowed";
+    case 408: return "Request Timeout";
     case 416: return "Range Not Satisfiable";
+    case 431: return "Request Header Fields Too Large";
     case 500: return "Internal Server Error";
     default:  return "Unknown";
     }
