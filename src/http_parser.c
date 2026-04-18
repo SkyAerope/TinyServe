@@ -226,6 +226,30 @@ int ts_request_parse(ts_request_t *req, const char *data, size_t len)
             }
 
             size_t name_len = colon - hline;
+            /* RFC 7230 §3.2.6: header field-name = 1*tchar.
+             * Reject everything else to make request smuggling and
+             * header-injection attacks harder. */
+            if (name_len == 0) {
+                LOG_ERROR("http_parser: empty header name");
+                return -1;
+            }
+            for (size_t i = 0; i < name_len; i++) {
+                unsigned char c = (unsigned char)hline[i];
+                /* tchar = ALPHA / DIGIT /
+                 *         "!" "#" "$" "%" "&" "'" "*" "+" "-" "."
+                 *         "^" "_" "`" "|" "~"  */
+                int ok = (c >= 'A' && c <= 'Z') ||
+                         (c >= 'a' && c <= 'z') ||
+                         (c >= '0' && c <= '9') ||
+                         c == '!' || c == '#' || c == '$' || c == '%' ||
+                         c == '&' || c == '\'' || c == '*' || c == '+' ||
+                         c == '-' || c == '.' || c == '^' || c == '_' ||
+                         c == '`' || c == '|' || c == '~';
+                if (!ok) {
+                    LOG_ERROR("http_parser: invalid header-name byte 0x%02x", c);
+                    return -1;
+                }
+            }
             char *val_start = colon + 1;
             /* Trim leading whitespace from value */
             while (val_start < hline + hlen && *val_start == ' ')
@@ -245,6 +269,17 @@ int ts_request_parse(ts_request_t *req, const char *data, size_t len)
             req->header_count++;
 
             pos = (size_t)eol + 2;
+        }
+
+        /* RFC 7230 §3.3.3: a message MUST NOT contain both
+         * Content-Length and Transfer-Encoding. This is the canonical
+         * request-smuggling vector — different intermediaries pick
+         * different framings. Reject with 400. */
+        const char *te = ts_request_header(req, "Transfer-Encoding");
+        const char *cl_check = ts_request_header(req, "Content-Length");
+        if (te && cl_check) {
+            LOG_ERROR("http_parser: both Content-Length and Transfer-Encoding present (smuggling)");
+            return -1;
         }
 
         /* Determine content_length after headers are parsed.

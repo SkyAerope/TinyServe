@@ -90,6 +90,25 @@ static void test_content_length_body(void) {
     ts_request_free(&req);
 }
 
+static void test_smuggling_cl_te_rejected(void) {
+    ts_request_t req; ts_request_init(&req);
+    const char *m =
+        "POST / HTTP/1.1\r\nHost: a\r\n"
+        "Content-Length: 5\r\nTransfer-Encoding: chunked\r\n\r\n";
+    int rc = ts_request_parse(&req, m, strlen(m));
+    assert(rc == -1);
+    ts_request_free(&req);
+}
+
+static void test_invalid_header_name_rejected(void) {
+    ts_request_t req; ts_request_init(&req);
+    /* Space in header name is forbidden by RFC 7230 \u00a73.2.6. */
+    const char *m = "GET / HTTP/1.1\r\nBad Name: x\r\n\r\n";
+    int rc = ts_request_parse(&req, m, strlen(m));
+    assert(rc == -1);
+    ts_request_free(&req);
+}
+
 int main(void) {
     test_simple_get();
     test_header_case_insensitive();
@@ -98,6 +117,8 @@ int main(void) {
     test_invalid_request_line();
     test_reset_for_keepalive();
     test_content_length_body();
+    test_smuggling_cl_te_rejected();
+    test_invalid_header_name_rejected();
     printf("test_http_parser: PASS\n");
     return 0;
 }
