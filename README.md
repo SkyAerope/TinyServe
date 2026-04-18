@@ -68,6 +68,8 @@ tinyserve [options]
 | `-t` | Proxy target host | — |
 | `-q` | Proxy target port (1-65535, strictly validated) | — |
 | `-l` | Log level: `error`, `warn`, `info` | `info` |
+| `-j` | Worker processes (`0` = auto-detect on Linux; capped to 1 on macOS). Multi-worker uses `fork()` + `SO_REUSEPORT`. | auto on Linux, `1` elsewhere |
+| `-n` | Maximum concurrent connections **per worker process** (1–1000000). | `1024` |
 | `-h` | Show help | — |
 
 ## Mode Examples
