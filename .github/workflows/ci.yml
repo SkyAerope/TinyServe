@@ -1,0 +1,76 @@
+name: ci
+# SPDX-License-Identifier: MIT
+
+on:
+  push:
+    branches: [main, debian/sid]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-and-test:
+    name: build + ctest (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, ubuntu-24.04]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: install build deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            cmake build-essential pkg-config libuv1-dev
+
+      - name: cmake configure (Release + hardening)
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+
+      - name: build
+        run: cmake --build build --parallel
+
+      - name: ctest
+        run: ctest --test-dir build --output-on-failure
+
+      - name: verify hardening
+        run: |
+          readelf -d build/tinyserve | grep -E 'BIND_NOW|FLAGS_1'
+          file build/tinyserve | grep -q 'pie executable'
+
+  debian-package:
+    name: debuild + lintian (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, ubuntu-24.04]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: install packaging deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            cmake build-essential pkg-config libuv1-dev \
+            debhelper devscripts lintian fakeroot dh-make
+
+      - name: dpkg-buildpackage
+        run: dpkg-buildpackage -us -uc -b
+
+      - name: lintian
+        run: lintian -EvIL +pedantic ../tinyserve_*.deb || true
+
+      - name: smoke (start binary, curl, kill)
+        run: |
+          sudo dpkg -i ../tinyserve_*.deb
+          mkdir -p /tmp/cw && echo ci-ok > /tmp/cw/index.html
+          /usr/bin/tinyserve -p 18901 -d /tmp/cw -a 127.0.0.1 \
+              > /tmp/ci.log 2>&1 &
+          PID=$!
+          for i in $(seq 1 50); do
+            if curl -sf -o /dev/null http://127.0.0.1:18901/; then break; fi
+            sleep 0.1
+          done
+          test "$(curl -sf http://127.0.0.1:18901/)" = "ci-ok"
+          kill "$PID" || true
