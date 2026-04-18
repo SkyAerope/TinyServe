@@ -29,3 +29,17 @@ ts_add_test(test_config SOURCES
     ${CMAKE_SOURCE_DIR}/src/config.c
     ${CMAKE_SOURCE_DIR}/src/log.c
 )
+ts_add_test(test_path_utils SOURCES
+    test_path_utils.c
+    ${CMAKE_SOURCE_DIR}/src/path_utils.c
+)
+ts_add_test(test_range SOURCES
+    test_range.c
+    ${CMAKE_SOURCE_DIR}/src/range.c
+    ${CMAKE_SOURCE_DIR}/src/log.c
+)
+ts_add_test(test_http_parser SOURCES
+    test_http_parser.c
+    ${CMAKE_SOURCE_DIR}/src/http_parser.c
+    ${CMAKE_SOURCE_DIR}/src/log.c
+)

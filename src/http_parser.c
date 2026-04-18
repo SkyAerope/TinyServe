@@ -194,8 +194,12 @@ int ts_request_parse(ts_request_t *req, const char *data, size_t len)
     if (!req->headers_complete) {
         for (;;) {
             int eol = find_crlf(req->buf, req->buf_len, pos);
-            if (eol < 0)
-                return 0; /* need more data */
+            if (eol < 0) {
+                /* Need more data — remember where to resume so we don't
+                 * re-parse the already-consumed request line on next call. */
+                req->parse_pos = pos;
+                return 0;
+            }
 
             /* Empty line = end of headers */
             if ((size_t)eol == pos) {

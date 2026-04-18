@@ -88,6 +88,12 @@ endif()
 
 install(TARGETS tinyserve RUNTIME DESTINATION bin)
 
+# ── Install man page (gzip on Debian via dh; here keep raw) ────────────
+include(GNUInstallDirs)
+install(FILES man/tinyserve.1
+    DESTINATION ${CMAKE_INSTALL_MANDIR}/man1
+)
+
 # ── Tests ────────────────────────────────────────────────────────────────
 enable_testing()
 add_subdirectory(tests)

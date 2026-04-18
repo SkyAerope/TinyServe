@@ -1,0 +1,117 @@
+.\" tinyserve(1) — minimal HTTP server
+.TH TINYSERVE 1 "2026-04-18" "tinyserve" "User Commands"
+.SH NAME
+tinyserve \- a small static-file, stub and reverse-proxy HTTP server
+.SH SYNOPSIS
+.B tinyserve
+.RI [ options ]
+.SH DESCRIPTION
+.B tinyserve
+is a small, single-process HTTP/1.1 server written in C on top of
+.BR libuv (3).
+It can act as a static file server, a configurable stub responder
+(useful for testing), or a reverse proxy.
+.PP
+The server supports HTTP keep-alive, byte-range requests
+(including multipart/byteranges), conditional GET via
+.I If-None-Match
+and
+.IR If-Modified-Since ,
+asynchronous directory listings, optional Basic or header authentication,
+configurable idle and read timeouts, and a per-process maximum
+connection cap.
+.SH OPTIONS
+.TP
+.BI \-m " mode"
+Server mode:
+.B f
+for file serving (default),
+.B s
+for stub/route mode,
+.B p
+for proxy mode.
+.TP
+.BI \-a " addr"
+Bind address (default
+.IR 127.0.0.1 ).
+.TP
+.BI \-p " port"
+Listen port (default
+.IR 8000 ).
+Must be 1\(en65535.
+.TP
+.BI \-d " dir"
+Root directory for file serving (default current directory).
+The path is canonicalized at startup; requests that resolve outside it
+are rejected with
+.BR 403 .
+.TP
+.BI \-c " file"
+Route configuration file (stub mode).
+.TP
+.BI \-u " user"
+Basic-auth username. Must be paired with
+.BR \-w .
+.TP
+.BI \-w " pass"
+Basic-auth password.
+.TP
+.BI \-k " header"
+Header-auth header name. Must be paired with
+.BR \-v .
+.TP
+.BI \-v " value"
+Header-auth expected value.
+.TP
+.BI \-t " host"
+Proxy target host (proxy mode).
+.TP
+.BI \-q " port"
+Proxy target port (proxy mode).
+.TP
+.BI \-l " level"
+Log level:
+.BR error ", " warn ", or " info " (default)" .
+.TP
+.BI \-j " num"
+Number of worker threads.
+.B 0
+selects the platform default (one per CPU on Linux, 1 elsewhere).
+.TP
+.BI \-n " num"
+Maximum concurrent connections per process.
+Connections beyond the cap receive
+.BR "503 Service Unavailable" .
+.TP
+.B \-h
+Print a short help message and exit.
+.SH EXIT STATUS
+.B tinyserve
+exits 0 on a clean shutdown (e.g. on
+.BR SIGTERM )
+and non-zero on a configuration error or fatal runtime failure.
+.SH SIGNALS
+.B SIGINT
+and
+.B SIGTERM
+trigger an orderly shutdown: the listening socket is closed, in-flight
+responses are allowed to drain, then the process exits.
+.SH SECURITY
+File serving rejects any request whose canonical path escapes the
+configured root directory. URL-encoded NUL bytes (\(lq%00\(rq) are
+rejected. Multipart/byteranges responses use a 128-bit cryptographic
+random boundary.
+Total request header size is capped (see
+.B 431 Request Header Fields Too Large
+in the response).
+.SH FILES
+Configuration files referenced by
+.B \-c
+are read once at startup. The runtime has no other configuration
+files of its own.
+.SH SEE ALSO
+.BR curl (1),
+.BR nginx (8),
+.BR systemd.service (5)
+.SH AUTHOR
+Derrity <derrity0731@proton.me>
