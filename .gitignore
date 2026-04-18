@@ -1,8 +1,9 @@
-build/
-*.o
+
 *.d
+*.o
+*.swp
 .DS_Store
 .history/
 .vscode/
-*.swp
-
+.xmake/
+build/

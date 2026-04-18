@@ -91,20 +91,57 @@ jobs:
           cmake --build build -j$(sysctl -n hw.ncpu)
           strip build/tinyserve
 
-      # ── Package ──
-      - name: Package
+      # ── Package as a tarball with binary + docs + man page ──
+      - name: Package tarball
         run: |
-          ARTIFACT=tinyserve-${{ matrix.target }}
-          cp build/tinyserve ${ARTIFACT}
-          shasum -a 256 ${ARTIFACT} > ${ARTIFACT}.sha256
-          echo "ARTIFACT=${ARTIFACT}" >> $GITHUB_ENV
+          VERSION="${GITHUB_REF_NAME#v}"
+          DIR="tinyserve-${VERSION}-${{ matrix.target }}"
+          mkdir -p "${DIR}/man"
+          cp build/tinyserve "${DIR}/tinyserve"
+          cp README.md LICENSE CHANGELOG.md "${DIR}/" 2>/dev/null || true
+          cp man/tinyserve.1 "${DIR}/man/" 2>/dev/null || true
+          tar -czf "${DIR}.tar.gz" "${DIR}"
+          shasum -a 256 "${DIR}.tar.gz" > "${DIR}.tar.gz.sha256"
+          # Also keep the bare binary for users who want a quick download.
+          cp build/tinyserve "tinyserve-${{ matrix.target }}"
+          shasum -a 256 "tinyserve-${{ matrix.target }}" \
+            > "tinyserve-${{ matrix.target }}.sha256"
+          echo "BIN_NAME=tinyserve-${{ matrix.target }}" >> $GITHUB_ENV
+          echo "TAR_NAME=${DIR}"                           >> $GITHUB_ENV
+
+      # ── Build a .deb on the native amd64 Linux runner ──
+      - name: Build .deb (Linux amd64 only)
+        if: matrix.target == 'linux-amd64'
+        run: |
+          sudo apt-get install -y --no-install-recommends \
+            debhelper devscripts fakeroot dh-make systemd
+          # Clean any prior CMake build artefacts in workspace; debuild
+          # uses its own build dir under obj-*.
+          rm -rf debian/.debhelper debian/files debian/tinyserve \
+                 debian/tmp debian/debhelper-build-stamp obj-*
+          dpkg-buildpackage -us -uc -b
+          mkdir -p deb-out
+          mv ../tinyserve_*.deb deb-out/
+          ( cd deb-out && for f in tinyserve_*.deb; do
+              shasum -a 256 "$f" > "${f}.sha256"
+            done )
 
       - uses: actions/upload-artifact@v4
         with:
-          name: ${{ env.ARTIFACT }}
+          name: ${{ env.TAR_NAME }}
           path: |
-            ${{ env.ARTIFACT }}
-            ${{ env.ARTIFACT }}.sha256
+            ${{ env.TAR_NAME }}.tar.gz
+            ${{ env.TAR_NAME }}.tar.gz.sha256
+            ${{ env.BIN_NAME }}
+            ${{ env.BIN_NAME }}.sha256
+
+      - uses: actions/upload-artifact@v4
+        if: matrix.target == 'linux-amd64'
+        with:
+          name: deb-amd64
+          path: |
+            deb-out/tinyserve_*.deb
+            deb-out/tinyserve_*.deb.sha256
 
   release:
     needs: build
@@ -124,3 +161,5 @@ jobs:
           generate_release_notes: true
           files: |
             artifacts/tinyserve-*
+            artifacts/tinyserve_*.deb
+            artifacts/tinyserve_*.deb.sha256

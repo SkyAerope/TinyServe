@@ -31,6 +31,21 @@ cmake --build build
 # Binary is at ./build/tinyserve
 ```
 
+### Alternative: build with [xmake](https://xmake.io)
+
+```bash
+xmake f -m release   # configure
+xmake                # build  -> ./build/<plat>/<arch>/release/tinyserve
+xmake test           # run the unit-test suite
+xmake install -o /usr/local   # optional system-wide install
+```
+
+### Pre-built binaries
+
+Each tagged release publishes ready-to-run binaries (Linux amd64,
+Linux arm64, macOS arm64, plus a Debian/Ubuntu `.deb`) on the
+[GitHub Releases page](https://github.com/Derrity/TinyServe/releases).
+
 ## Usage
 
 ```
