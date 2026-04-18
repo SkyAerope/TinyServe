@@ -1,0 +1,20 @@
+#!/usr/bin/make -f
+# SPDX-License-Identifier: MIT
+
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+
+%:
+	dh $@ --buildsystem=cmake
+
+override_dh_auto_test:
+	# Respect DEB_BUILD_OPTIONS=nocheck
+	if echo "$$DEB_BUILD_OPTIONS" | grep -qw nocheck; then \
+		echo "skipping tests (nocheck)"; \
+	else \
+		dh_auto_test; \
+	fi
+
+override_dh_auto_install:
+	dh_auto_install
+	install -D -m 0644 debian/tinyserve.service \
+		debian/tinyserve/lib/systemd/system/tinyserve.service

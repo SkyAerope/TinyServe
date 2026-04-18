@@ -1,0 +1,3 @@
+Tests: smoke
+Depends: @, curl, procps
+Restrictions: allow-stderr, needs-root

@@ -7,6 +7,7 @@
 #include "path_utils.h"
 
 #include <assert.h>
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -58,17 +59,17 @@ static void test_url_decode_invalid_hex(void) {
 }
 
 static void test_path_resolve_normal(void) {
-    char out[512];
+    char out[PATH_MAX];
     assert(ts_path_resolve(g_root, "/sub/file.txt", out, sizeof(out)) == 0);
-    char want[512];
-    char real[512];
+    char want[PATH_MAX];
+    char real[PATH_MAX];
     assert(realpath(g_root, real) != NULL);
     snprintf(want, sizeof(want), "%s/sub/file.txt", real);
     assert(strcmp(out, want) == 0);
 }
 
 static void test_path_resolve_traversal_dotdot(void) {
-    char out[512];
+    char out[PATH_MAX];
     /* Direct traversal */
     assert(ts_path_resolve(g_root, "/../etc/passwd", out, sizeof(out)) == -1);
     /* Encoded traversal */
@@ -78,19 +79,19 @@ static void test_path_resolve_traversal_dotdot(void) {
 }
 
 static void test_path_resolve_backslash_normalized(void) {
-    char out[512];
+    char out[PATH_MAX];
     /* Backslash treated as separator and normalized; the resulting path
      * inside root must still be valid. */
     assert(ts_path_resolve(g_root, "/sub\\file.txt", out, sizeof(out)) == 0);
 }
 
 static void test_path_resolve_collapses_slashes(void) {
-    char out[512];
+    char out[PATH_MAX];
     assert(ts_path_resolve(g_root, "//sub///file.txt", out, sizeof(out)) == 0);
 }
 
 static void test_path_resolve_strips_query(void) {
-    char out[512];
+    char out[PATH_MAX];
     assert(ts_path_resolve(g_root, "/sub/file.txt?x=1&y=2", out, sizeof(out)) == 0);
 }
 

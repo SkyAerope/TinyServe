@@ -1,0 +1,30 @@
+#!/bin/sh
+# autopkgtest smoke-test for tinyserve
+set -e
+
+PORT=18801
+ROOT="$AUTOPKGTEST_TMP/www"
+mkdir -p "$ROOT"
+echo "smoke-ok" > "$ROOT/index.html"
+
+/usr/bin/tinyserve -p "$PORT" -d "$ROOT" -a 127.0.0.1 \
+    > "$AUTOPKGTEST_TMP/tinyserve.log" 2>&1 &
+PID=$!
+
+cleanup() {
+    kill "$PID" 2>/dev/null || true
+    wait "$PID" 2>/dev/null || true
+}
+trap cleanup EXIT
+
+# Wait for the listener (max ~5s).
+for i in $(seq 1 50); do
+    if curl -sf -o /dev/null "http://127.0.0.1:$PORT/index.html"; then
+        break
+    fi
+    sleep 0.1
+done
+
+body=$(curl -sf "http://127.0.0.1:$PORT/index.html")
+test "$body" = "smoke-ok"
+echo "PASS"

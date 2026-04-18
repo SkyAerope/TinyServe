@@ -1,0 +1,19 @@
+tinyserve (0.3.0-1) unstable; urgency=medium
+
+  * Initial release.
+    - Multi-worker HTTP/1.1 server on libuv with SO_REUSEPORT.
+    - Static file serving with byte-range, ETag, Last-Modified, 304.
+    - Asynchronous directory listings via uv_queue_work.
+    - Basic-auth, reverse proxy, JSON route table.
+    - Per-connection idle and request timeouts; SOMAXCONN backlog;
+      bounded concurrent connections (503 on excess).
+    - Hardened HTTP parser: rejects CL+TE smuggling, non-tchar
+      header names, NUL/CRLF in request-target.
+    - Log-injection sanitization.
+    - Hardened Release build (PIE, RELRO, BIND_NOW, FORTIFY_SOURCE,
+      stack-protector-strong, stack-clash-protection).
+    - Cryptographically strong multipart-range boundaries
+      (getrandom / arc4random_buf / /dev/urandom).
+    - Unit tests under CTest; man page tinyserve(1).
+
+ -- Derrity <derrity0731@proton.me>  Sun, 23 Nov 2025 00:00:00 +0000

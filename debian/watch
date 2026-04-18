@@ -1,0 +1,4 @@
+version=4
+opts=filenamemangle=s/.+\/v?(\d\S+)\.tar\.gz/tinyserve-$1.tar.gz/ \
+  https://github.com/Derrity/TinyServe/tags \
+  .*/v?(\d\S+)\.tar\.gz

@@ -1,0 +1,29 @@
+Source: tinyserve
+Section: web
+Priority: optional
+Maintainer: Derrity <derrity0731@proton.me>
+Build-Depends: debhelper-compat (= 13),
+               cmake,
+               pkg-config,
+               libuv1-dev
+Standards-Version: 4.7.0
+Rules-Requires-Root: no
+Homepage: https://github.com/Derrity/TinyServe
+Vcs-Git: https://github.com/Derrity/TinyServe.git
+Vcs-Browser: https://github.com/Derrity/TinyServe
+
+Package: tinyserve
+Architecture: any
+Depends: ${shlibs:Depends},
+         ${misc:Depends},
+         adduser
+Description: tiny multi-worker HTTP server built on libuv
+ TinyServe is a small static-file and reverse-proxy HTTP/1.1 server
+ written in C on top of libuv. It supports a SO_REUSEPORT-based
+ multi-worker model, byte-range requests, ETag/Last-Modified caching,
+ directory listings, basic authentication, and a JSON-driven route
+ table.
+ .
+ The package ships an optional systemd service that runs the server
+ under a dynamically allocated unprivileged user with a hardened
+ sandbox (DynamicUser, ProtectSystem=strict, NoNewPrivileges).

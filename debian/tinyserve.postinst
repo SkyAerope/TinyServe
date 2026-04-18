@@ -1,0 +1,30 @@
+#!/bin/sh
+set -e
+
+case "$1" in
+    configure)
+        if [ ! -d /var/www/tinyserve ]; then
+            mkdir -p /var/www/tinyserve
+        fi
+        # Friendly default index so a fresh install has something to serve.
+        if [ ! -e /var/www/tinyserve/index.html ]; then
+            cat >/var/www/tinyserve/index.html <<'EOF'
+<!doctype html>
+<html><head><title>tinyserve</title></head>
+<body><h1>It works.</h1>
+<p>Replace the contents of <code>/var/www/tinyserve</code>.</p></body>
+</html>
+EOF
+        fi
+        ;;
+    abort-upgrade|abort-remove|abort-deconfigure)
+        ;;
+    *)
+        echo "postinst called with unknown argument \`$1'" >&2
+        exit 1
+        ;;
+esac
+
+#DEBHELPER#
+
+exit 0

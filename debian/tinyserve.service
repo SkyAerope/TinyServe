@@ -1,0 +1,38 @@
+[Unit]
+Description=TinyServe HTTP server
+Documentation=man:tinyserve(1)
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/tinyserve -a 0.0.0.0 -p 8000 -d /var/www/tinyserve
+Restart=on-failure
+RestartSec=2
+
+# Hardening
+DynamicUser=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+ProtectProc=invisible
+NoNewPrivileges=yes
+RestrictAddressFamilies=AF_INET AF_INET6
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallFilter=~@privileged @resources
+ReadOnlyPaths=/var/www/tinyserve
+
+[Install]
+WantedBy=multi-user.target

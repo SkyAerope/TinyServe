@@ -19,6 +19,11 @@ function(ts_add_test name)
     endif()
     target_compile_options(${name} PRIVATE
         -Wall -Wextra -Wpedantic -Wno-unused-parameter
+        # Tests rely on assert() side effects (the only checking
+        # mechanism we use). Make sure NDEBUG is never defined here,
+        # even when CMAKE_BUILD_TYPE=Release adds -DNDEBUG, otherwise
+        # every assertion silently turns into a no-op.
+        -UNDEBUG
     )
     add_test(NAME ${name} COMMAND ${name})
 endfunction()
