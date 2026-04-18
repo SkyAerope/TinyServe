@@ -11,6 +11,8 @@
 #include "log.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdarg.h>
+#include <stdint.h>
 #include <string.h>
 #include <sys/stat.h>
 #include <dirent.h>
@@ -362,6 +364,69 @@ struct ts_dirlist_work_s {
     int status;                /* 200 on success, 500 on OOM/opendir error */
 };
 
+/* Hard cap on directory listing HTML to bound memory regardless of
+ * directory size. 16 MiB is far beyond any realistic browser use case
+ * (hundreds of thousands of entries). */
+#define TS_DIRLIST_MAX_BYTES (16u * 1024u * 1024u)
+
+/* Grow *buf so that it can hold at least len + need + 1 bytes.
+ * Doubles capacity, with overflow protection and an absolute cap.
+ * Returns 0 on success, -1 on OOM or cap exceeded; on failure *buf is
+ * freed and set to NULL. */
+static int dl_grow(char **buf, size_t *cap, size_t len, size_t need) {
+    if (need > SIZE_MAX - len - 1) goto fail;
+    size_t want = len + need + 1;
+    if (want <= *cap) return 0;
+    if (want > TS_DIRLIST_MAX_BYTES) goto fail;
+
+    size_t ncap = *cap;
+    while (ncap < want) {
+        if (ncap > SIZE_MAX / 2) { ncap = want; break; }
+        ncap *= 2;
+    }
+    if (ncap > TS_DIRLIST_MAX_BYTES) ncap = TS_DIRLIST_MAX_BYTES;
+    if (ncap < want) goto fail;
+
+    char *p = realloc(*buf, ncap);
+    if (!p) goto fail;
+    *buf = p;
+    *cap = ncap;
+    return 0;
+
+fail:
+    free(*buf);
+    *buf = NULL;
+    return -1;
+}
+
+static int dl_append_n(char **buf, size_t *cap, size_t *len,
+                       const char *s, size_t n) {
+    if (dl_grow(buf, cap, *len, n) != 0) return -1;
+    memcpy(*buf + *len, s, n);
+    *len += n;
+    return 0;
+}
+
+static int dl_append(char **buf, size_t *cap, size_t *len, const char *s) {
+    return dl_append_n(buf, cap, len, s, strlen(s));
+}
+
+static int dl_appendf(char **buf, size_t *cap, size_t *len,
+                      const char *fmt, ...)
+    __attribute__((format(printf, 4, 5)));
+static int dl_appendf(char **buf, size_t *cap, size_t *len,
+                      const char *fmt, ...) {
+    char tmp[2048];
+    va_list ap;
+    va_start(ap, fmt);
+    int n = vsnprintf(tmp, sizeof(tmp), fmt, ap);
+    va_end(ap);
+    if (n <= 0) return 0;
+    size_t sz = (size_t)n;
+    if (sz >= sizeof(tmp)) sz = sizeof(tmp) - 1;
+    return dl_append_n(buf, cap, len, tmp, sz);
+}
+
 /* Build directory HTML on the thread pool. Must not touch `client`. */
 static void dirlist_work_cb(uv_work_t *req) {
     ts_dirlist_work_t *w = req->data;
@@ -381,32 +446,10 @@ static void dirlist_work_cb(uv_work_t *req) {
         return;
     }
 
-#define DL_GROW(need) do { \
-    size_t _need = (need); \
-    while (len + _need + 1 > cap) { \
-        size_t _ncap = cap * 2; \
-        char *_p = realloc(html, _ncap); \
-        if (!_p) { free(html); closedir(dir); return; } \
-        html = _p; cap = _ncap; \
-    } \
-} while (0)
-
-#define DL_APPEND(s) do { \
-    size_t _sl = strlen(s); \
-    DL_GROW(_sl); \
-    memcpy(html + len, (s), _sl); len += _sl; \
-} while (0)
-
-#define DL_APPENDF(...) do { \
-    char _tmp[2048]; \
-    int _rn = snprintf(_tmp, sizeof(_tmp), __VA_ARGS__); \
-    if (_rn > 0) { \
-        size_t _sz = (size_t)_rn; \
-        if (_sz >= sizeof(_tmp)) _sz = sizeof(_tmp) - 1; \
-        DL_GROW(_sz); \
-        memcpy(html + len, _tmp, _sz); len += _sz; \
-    } \
-} while (0)
+#define DL_APPEND(s)    do { if (dl_append (&html, &cap, &len, (s)) != 0) \
+                              { closedir(dir); return; } } while (0)
+#define DL_APPENDF(...) do { if (dl_appendf(&html, &cap, &len, __VA_ARGS__) != 0) \
+                              { closedir(dir); return; } } while (0)
 
     char escaped_path[TS_MAX_PATH * 6];
     html_escape(w->url_path, escaped_path, sizeof(escaped_path));
@@ -449,7 +492,6 @@ static void dirlist_work_cb(uv_work_t *req) {
 
 #undef DL_APPEND
 #undef DL_APPENDF
-#undef DL_GROW
 
     closedir(dir);
     w->html = html;
