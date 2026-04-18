@@ -22,8 +22,13 @@ static void alloc_cb(uv_handle_t *handle, size_t suggested_size, uv_buf_t *buf)
 
 static void write_done_cb(uv_write_t *req, int status)
 {
-    ts_write_req_t *wr = (ts_write_req_t *)req;
+    ts_write_req_t *wr  = (ts_write_req_t *)req;
     ts_proxy_ctx_t *ctx = req->data;
+
+    /* Capture the destination stream BEFORE freeing wr — `req` aliases
+     * the first member of `wr`, so reading req->handle after free(wr)
+     * would be a use-after-free (caught by gcc -Wuse-after-free). */
+    uv_stream_t *target = req->handle;
 
     free(wr->buf.base);
     free(wr);
@@ -37,7 +42,6 @@ static void write_done_cb(uv_write_t *req, int status)
     if (ctx->closing) return;
 
     /* Backpressure: resume reading on the opposite side if it was paused. */
-    uv_stream_t *target = req->handle;
     if (target == (uv_stream_t *)&ctx->upstream && !ctx->client_reading &&
         !ctx->client_eof) {
         uv_read_start((uv_stream_t *)&ctx->client, alloc_cb, on_client_read);
