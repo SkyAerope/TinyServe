@@ -5,6 +5,47 @@
 #include <stdio.h>
 #include <time.h>
 #include <stdint.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <errno.h>
+
+#if defined(TS_HAVE_GETRANDOM)
+#  include <sys/random.h>
+#endif
+
+/* Fill buf with len cryptographically strong random bytes.
+ * Tries getrandom(2), then arc4random_buf(3), then /dev/urandom. */
+static int ts_secure_random(void *buf, size_t len) {
+#if defined(TS_HAVE_GETRANDOM)
+    {
+        size_t got = 0;
+        while (got < len) {
+            ssize_t r = getrandom((char *)buf + got, len - got, 0);
+            if (r < 0) { if (errno == EINTR) continue; break; }
+            got += (size_t)r;
+        }
+        if (got == len) return 0;
+    }
+#endif
+#if defined(TS_HAVE_ARC4RANDOM_BUF)
+    arc4random_buf(buf, len);
+    return 0;
+#else
+    {
+        int fd = open("/dev/urandom", O_RDONLY | O_CLOEXEC);
+        if (fd < 0) return -1;
+        size_t got = 0;
+        while (got < len) {
+            ssize_t r = read(fd, (char *)buf + got, len - got);
+            if (r < 0) { if (errno == EINTR) continue; close(fd); return -1; }
+            if (r == 0) { close(fd); return -1; }
+            got += (size_t)r;
+        }
+        close(fd);
+        return 0;
+    }
+#endif
+}
 
 /* Safely accumulate a digit into an int64_t.
  * Returns 0 on success, -1 on overflow. */
@@ -119,25 +160,27 @@ int ts_range_parse(const char *header, int64_t file_size,
 }
 
 void ts_range_boundary(char *buf, size_t buf_size) {
-    static int seeded = 0;
-    if (!seeded) {
-        srand((unsigned int)time(NULL));
-        seeded = 1;
-    }
-
     const char *prefix = "tinyserve_";
     size_t plen = strlen(prefix);
-    size_t hex_len = 16;
+    size_t hex_len = 32;  /* 128 bits of entropy */
 
     if (buf_size < plen + hex_len + 1) {
         buf[0] = '\0';
         return;
     }
 
+    unsigned char rnd[16];
+    if (ts_secure_random(rnd, sizeof(rnd)) != 0) {
+        LOG_ERROR("secure random source unavailable for boundary");
+        buf[0] = '\0';
+        return;
+    }
+
     memcpy(buf, prefix, plen);
-    for (size_t i = 0; i < hex_len; i++) {
-        int v = rand() & 0x0F;
-        buf[plen + i] = "0123456789abcdef"[v];
+    static const char hex[] = "0123456789abcdef";
+    for (size_t i = 0; i < sizeof(rnd); i++) {
+        buf[plen + i * 2]     = hex[(rnd[i] >> 4) & 0xF];
+        buf[plen + i * 2 + 1] = hex[rnd[i]        & 0xF];
     }
     buf[plen + hex_len] = '\0';
 }

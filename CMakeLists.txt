@@ -29,6 +29,11 @@ if(NOT LIBUV_FOUND AND NOT LIBUV_INCLUDE_DIRS)
     message(FATAL_ERROR "libuv not found. Install libuv or set -DCMAKE_PREFIX_PATH=<libuv-install-dir>")
 endif()
 
+# Probe for getrandom() (Linux 3.17+) / arc4random_buf (BSD, macOS).
+include(CheckSymbolExists)
+check_symbol_exists(getrandom      "sys/random.h" TS_HAVE_GETRANDOM)
+check_symbol_exists(arc4random_buf "stdlib.h"    TS_HAVE_ARC4RANDOM_BUF)
+
 add_executable(tinyserve
     src/main.c
     src/log.c
@@ -58,6 +63,13 @@ if(LIBUV_LIBRARY_DIRS)
     target_link_directories(tinyserve PRIVATE
         ${LIBUV_LIBRARY_DIRS}
     )
+endif()
+
+if(TS_HAVE_GETRANDOM)
+    target_compile_definitions(tinyserve PRIVATE TS_HAVE_GETRANDOM=1)
+endif()
+if(TS_HAVE_ARC4RANDOM_BUF)
+    target_compile_definitions(tinyserve PRIVATE TS_HAVE_ARC4RANDOM_BUF=1)
 endif()
 
 # Compiler warnings
