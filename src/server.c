@@ -10,6 +10,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <signal.h>
+#include <stdatomic.h>
 
 static uv_loop_t *loop;
 static uv_tcp_t server_handle;
@@ -17,6 +18,10 @@ static ts_config_t *g_config;
 static ts_route_list_t g_routes;
 
 static uv_signal_t sigint_handle, sigterm_handle;
+
+/* Active connection counter (process-wide). Incremented when accept
+ * succeeds; decremented in the client close callback. */
+static atomic_int g_conn_count = 0;
 
 static ts_client_t *client_alloc(void) {
     ts_client_t *client = calloc(1, sizeof(ts_client_t));
@@ -34,6 +39,7 @@ static ts_client_t *client_alloc(void) {
 static void client_close_cb(uv_handle_t *handle) {
     ts_client_t *client = handle->data;
     if (client->file_ctx) {
+    atomic_fetch_sub(&g_conn_count, 1);
         free(client->file_ctx->read_buf);
         free(client->file_ctx);
     }
@@ -171,9 +177,36 @@ static void on_connection(uv_stream_t *server, int status) {
         ts_proxy_handle_connection(server, g_config, loop);
         return;
     }
+/* Enforce max connections cap. We accept first so the kernel's
+     * accept queue doesn't fill up with stale SYNs, then either serve
+     * a 503 or reject. */
+    int prev = atomic_fetch_add(&g_conn_count, 1);
+    if (prev >= g_config->max_connections) {
+        atomic_fetch_sub(&g_conn_count, 1);
+        /* Accept and immediately close to drain the accept queue. */
+        uv_tcp_t *drop = calloc(1, sizeof(*drop));
+        if (!drop) return;
+        uv_tcp_init(loop, drop);
+        if (uv_accept(server, (uv_stream_t *)drop) == 0) {
+            static const char body[] =
+                "HTTP/1.1 503 Service Unavailable\r\n"
+                "Content-Type: text/plain\r\n"
+                "Content-Length: 19\r\n"
+                "Connection: close\r\n"
+                "\r\n"
+                "Service Unavailable";
+            uv_buf_t b = uv_buf_init((char *)body, sizeof(body) - 1);
+            uv_try_write((uv_stream_t *)drop, &b, 1);
+        }
+        uv_close((uv_handle_t *)drop, (uv_close_cb)free);
+        LOG_WARN("connection cap reached (%d), sent 503",
+                 g_config->max_connections);
+        return;
+    }
 
     ts_client_t *client = client_alloc();
     if (!client) {
+        atomic_fetch_sub(&g_conn_count, 1);
         LOG_ERROR("failed to allocate client");
         return;
     }
