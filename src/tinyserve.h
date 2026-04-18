@@ -49,6 +49,10 @@ typedef struct {
     const char *target_host;/* -t */
     int target_port;        /* -q */
     int log_level;          /* 0=error,1=warn,2=info */
+    int workers;            /* -j, 0 = auto (CPU count) */
+    int max_connections;    /* -n, per-process cap */
+    int idle_timeout_ms;    /* keep-alive idle timeout */
+    int read_timeout_ms;    /* request read timeout */
 } ts_config_t;
 
 /* ── HTTP Header ── */

@@ -24,3 +24,8 @@ function(ts_add_test name)
 endfunction()
 
 ts_add_test(test_smoke SOURCES test_smoke.c)
+ts_add_test(test_config SOURCES
+    test_config.c
+    ${CMAKE_SOURCE_DIR}/src/config.c
+    ${CMAKE_SOURCE_DIR}/src/log.c
+)

@@ -21,6 +21,10 @@ void ts_config_defaults(ts_config_t *cfg)
     cfg->target_host = NULL;
     cfg->target_port = 0;
     cfg->log_level   = TS_LOG_INFO;
+    cfg->workers         = TS_DEFAULT_WORKERS;
+    cfg->max_connections = TS_DEFAULT_MAX_CONNECTIONS;
+    cfg->idle_timeout_ms = TS_DEFAULT_IDLE_TIMEOUT_MS;
+    cfg->read_timeout_ms = TS_DEFAULT_READ_TIMEOUT_MS;
 }
 
 void ts_config_print_help(const char *prog)
@@ -40,6 +44,9 @@ void ts_config_print_help(const char *prog)
     printf("  -t <host>    Proxy target host\n");
     printf("  -q <port>    Proxy target port\n");
     printf("  -l <level>   Log level: error, warn, info (default: info)\n");
+    printf("  -j <num>     Number of worker threads (0=auto, default: auto on Linux, 1 elsewhere)\n");
+    printf("  -n <num>     Maximum concurrent connections per process (default: %d)\n",
+           TS_DEFAULT_MAX_CONNECTIONS);
     printf("  -h           Show this help message\n");
 }
 
@@ -67,6 +74,30 @@ static int strict_parse_port(const char *s, const char *flag_name)
     return (int)val;
 }
 
+/* Parse a non-negative integer with an inclusive upper bound.
+ * Returns 0 on success with the value in *out, -1 on any error. */
+static int strict_parse_nonneg(const char *s, const char *flag_name,
+                               long max_val, long *out)
+{
+    if (!s || *s == '\0') {
+        LOG_ERROR("%s: empty value", flag_name);
+        return -1;
+    }
+    errno = 0;
+    char *end = NULL;
+    long val = strtol(s, &end, 10);
+    if (end == s || *end != '\0') {
+        LOG_ERROR("%s: not a valid integer: '%s'", flag_name, s);
+        return -1;
+    }
+    if (errno == ERANGE || val < 0 || val > max_val) {
+        LOG_ERROR("%s: out of range (0-%ld): '%s'", flag_name, max_val, s);
+        return -1;
+    }
+    *out = val;
+    return 0;
+}
+
 int ts_config_parse(int argc, char **argv, ts_config_t *cfg)
 {
     int opt;
@@ -74,7 +105,7 @@ int ts_config_parse(int argc, char **argv, ts_config_t *cfg)
     /* Reset getopt state for repeated calls */
     optind = 1;
 
-    while ((opt = getopt(argc, argv, "m:a:p:d:c:u:w:k:v:t:q:l:h")) != -1) {
+    while ((opt = getopt(argc, argv, "m:a:p:d:c:u:w:k:v:t:q:l:j:n:h")) != -1) {
         switch (opt) {
         case 'm':
             if (optarg[0] != 'f' && optarg[0] != 's' && optarg[0] != 'p') {
@@ -131,6 +162,22 @@ int ts_config_parse(int argc, char **argv, ts_config_t *cfg)
                 return -1;
             }
             break;
+        case 'j': {
+            long v;
+            if (strict_parse_nonneg(optarg, "-j", 1024, &v) < 0) return -1;
+            cfg->workers = (int)v;
+            break;
+        }
+        case 'n': {
+            long v;
+            if (strict_parse_nonneg(optarg, "-n", 1000000, &v) < 0) return -1;
+            if (v < 1) {
+                LOG_ERROR("-n: must be >= 1");
+                return -1;
+            }
+            cfg->max_connections = (int)v;
+            break;
+        }
         case 'h':
             ts_config_print_help(argv[0]);
             return 1;
