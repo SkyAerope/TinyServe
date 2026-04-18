@@ -4,6 +4,32 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
+
+/* ── Server / Date header helper ──
+ * Returns a pointer to a thread-local buffer containing:
+ *   "Date: <RFC 1123 GMT>\r\nServer: tinyserve/<version>\r\n"
+ * The Date value is cached to one-second granularity to keep strftime
+ * off the hot path. */
+static const char *ts_common_headers(void)
+{
+    static _Thread_local time_t cached_sec = 0;
+    static _Thread_local char   cached[128];
+
+    time_t now = time(NULL);
+    if (now != cached_sec) {
+        struct tm tm;
+        gmtime_r(&now, &tm);
+        char date[64];
+        strftime(date, sizeof(date), "%a, %d %b %Y %H:%M:%S GMT", &tm);
+        int n = snprintf(cached, sizeof(cached),
+                         "Date: %s\r\nServer: tinyserve/%s\r\n",
+                         date, TS_VERSION);
+        if (n <= 0) cached[0] = '\0';
+        cached_sec = now;
+    }
+    return cached;
+}
 
 const char *ts_status_text(int status)
 {
@@ -107,12 +133,14 @@ int ts_response_send(ts_client_t *client, int status,
     char hdr[4096];
     int hdr_len = snprintf(hdr, sizeof(hdr),
         "HTTP/1.%d %d %s\r\n"
+        "%s"
         "Content-Type: %s\r\n"
         "Content-Length: %zu\r\n"
         "Connection: %s\r\n"
         "%s"
         "\r\n",
         http_minor, status, reason,
+        ts_common_headers(),
         content_type,
         body_len,
         conn,
@@ -180,12 +208,14 @@ int ts_response_send_headers(ts_client_t *client, int status,
     if (content_length >= 0) {
         hdr_len = snprintf(hdr, sizeof(hdr),
             "HTTP/1.%d %d %s\r\n"
+            "%s"
             "Content-Type: %s\r\n"
             "Content-Length: %lld\r\n"
             "Connection: %s\r\n"
             "%s"
             "\r\n",
             http_minor, status, reason,
+            ts_common_headers(),
             content_type,
             (long long)content_length,
             conn,
@@ -193,11 +223,13 @@ int ts_response_send_headers(ts_client_t *client, int status,
     } else {
         hdr_len = snprintf(hdr, sizeof(hdr),
             "HTTP/1.%d %d %s\r\n"
+            "%s"
             "Content-Type: %s\r\n"
             "Connection: %s\r\n"
             "%s"
             "\r\n",
             http_minor, status, reason,
+            ts_common_headers(),
             content_type,
             conn,
             extra_headers ? extra_headers : "");
