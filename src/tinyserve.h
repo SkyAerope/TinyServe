@@ -4,6 +4,7 @@
 #include <uv.h>
 #include <stdint.h>
 #include <stddef.h>
+#include <sys/socket.h>   /* SOMAXCONN */
 
 #define TS_VERSION "0.3.0"
 #define TS_MAX_HEADERS 64
@@ -15,6 +16,19 @@
 #define TS_NOT_FOUND_BODY "Nothing Found in the PATH"
 #define TS_MAX_HEADER_SIZE 8192          /* max total header block size */
 #define TS_MAX_BODY_SIZE (10*1024*1024)  /* max request body: 10 MB */
+
+/* ── Server-wide tunables ── */
+#ifndef TS_DEFAULT_BACKLOG
+#  ifdef SOMAXCONN
+#    define TS_DEFAULT_BACKLOG SOMAXCONN
+#  else
+#    define TS_DEFAULT_BACKLOG 1024
+#  endif
+#endif
+#define TS_DEFAULT_MAX_CONNECTIONS 10000 /* per-process cap */
+#define TS_DEFAULT_IDLE_TIMEOUT_MS 30000 /* keep-alive idle timeout */
+#define TS_DEFAULT_READ_TIMEOUT_MS 10000 /* request read timeout */
+#define TS_DEFAULT_WORKERS         0     /* 0 = auto (CPU count) */
 
 /* Forward declarations */
 typedef struct ts_client_s ts_client_t;
