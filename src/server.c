@@ -102,6 +102,10 @@ void ts_client_close(ts_client_t *client) {
     if (client->closing) return;
     client->closing = 1;
 
+    /* Detach any outstanding directory listing work so its completion
+     * callback knows to drop the result. */
+    ts_file_serve_detach(client);
+
     /* Clean up any in-progress file context */
     if (client->file_ctx) {
         if (client->file_ctx->fd >= 0) {

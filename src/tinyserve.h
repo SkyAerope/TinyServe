@@ -34,6 +34,7 @@
 typedef struct ts_client_s ts_client_t;
 typedef struct ts_proxy_ctx_s ts_proxy_ctx_t;
 typedef struct ts_file_ctx_s ts_file_ctx_t;
+typedef struct ts_dirlist_work_s ts_dirlist_work_t;
 
 /* ── Configuration ── */
 typedef struct {
@@ -116,6 +117,11 @@ struct ts_client_s {
     uv_loop_t *loop;
     /* async file serving context (non-NULL while serving a file) */
     ts_file_ctx_t *file_ctx;
+    /* async directory listing work item (non-NULL while a uv_queue_work
+     * is outstanding for this connection). When ts_client_close fires,
+     * the work item's client pointer is cleared so after_work_cb knows
+     * to drop its result. */
+    ts_dirlist_work_t *dirlist_work;
     /* for route mode */
     ts_route_list_t *routes;
     /* flags */

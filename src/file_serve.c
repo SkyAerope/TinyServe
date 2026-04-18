@@ -13,6 +13,7 @@
 #include <sys/stat.h>
 #include <dirent.h>
 #include <unistd.h>
+#include <errno.h>
 
 /* Write request that tracks its owning file context for chained reads. */
 typedef struct {
@@ -337,106 +338,171 @@ static size_t url_encode(const char *src, char *dst, size_t dst_size)
     return di;
 }
 
-/* ── Generate and send directory listing (synchronous HTML build) ── */
-static void send_directory_listing(ts_client_t *client, const char *fs_path,
-                                   const char *url_path) {
-    int is_head = (strcmp(client->req.method, "HEAD") == 0);
+/* ── Directory listing work item (async, uses thread pool) ── */
+struct ts_dirlist_work_s {
+    uv_work_t req;
+    ts_client_t *client;       /* NULL if client closed before completion */
+    char fs_path[TS_MAX_PATH];
+    char url_path[TS_MAX_PATH];
+    int is_head;
+    /* Output (populated by work_cb on thread pool) */
+    char *html;
+    size_t html_len;
+    int status;                /* 200 on success, 500 on OOM/opendir error */
+};
 
-    DIR *dir = opendir(fs_path);
-    if (!dir) {
-        ts_response_send_404(client, is_head);
-        return;
-    }
+/* Build directory HTML on the thread pool. Must not touch `client`. */
+static void dirlist_work_cb(uv_work_t *req) {
+    ts_dirlist_work_t *w = req->data;
 
-    /* Build HTML in a dynamic buffer */
+    w->html = NULL;
+    w->html_len = 0;
+    w->status = 500;
+
+    DIR *dir = opendir(w->fs_path);
+    if (!dir) return;
+
     size_t cap = 4096;
     size_t len = 0;
     char *html = malloc(cap);
     if (!html) {
         closedir(dir);
-        /* Send a simple error and signal done */
-        ts_response_send(client, 500, "text/plain",
-                         "Internal Server Error", 21, NULL, is_head);
         return;
     }
 
-#define APPEND(s) do { \
-    size_t _sl = strlen(s); \
-    while (len + _sl + 1 > cap) { cap *= 2; html = realloc(html, cap); } \
-    memcpy(html + len, s, _sl); len += _sl; \
-} while (0)
-
-#define APPENDF(...) do { \
-    char _tmp[2048]; \
-    int _n = snprintf(_tmp, sizeof(_tmp), __VA_ARGS__); \
-    if (_n > 0) { \
-        while (len + (size_t)_n + 1 > cap) { cap *= 2; html = realloc(html, cap); } \
-        memcpy(html + len, _tmp, (size_t)_n); len += (size_t)_n; \
+#define DL_GROW(need) do { \
+    size_t _need = (need); \
+    while (len + _need + 1 > cap) { \
+        size_t _ncap = cap * 2; \
+        char *_p = realloc(html, _ncap); \
+        if (!_p) { free(html); closedir(dir); return; } \
+        html = _p; cap = _ncap; \
     } \
 } while (0)
 
-    /* HTML-escape the URL path for display in title and heading */
+#define DL_APPEND(s) do { \
+    size_t _sl = strlen(s); \
+    DL_GROW(_sl); \
+    memcpy(html + len, (s), _sl); len += _sl; \
+} while (0)
+
+#define DL_APPENDF(...) do { \
+    char _tmp[2048]; \
+    int _rn = snprintf(_tmp, sizeof(_tmp), __VA_ARGS__); \
+    if (_rn > 0) { \
+        size_t _sz = (size_t)_rn; \
+        if (_sz >= sizeof(_tmp)) _sz = sizeof(_tmp) - 1; \
+        DL_GROW(_sz); \
+        memcpy(html + len, _tmp, _sz); len += _sz; \
+    } \
+} while (0)
+
     char escaped_path[TS_MAX_PATH * 6];
-    html_escape(url_path, escaped_path, sizeof(escaped_path));
+    html_escape(w->url_path, escaped_path, sizeof(escaped_path));
 
-    APPENDF("<!DOCTYPE html>\n<html><head><title>Index of %s</title>\n",
-            escaped_path);
-    APPEND("<style>body{font-family:monospace;margin:2em}"
-           "a{text-decoration:none}a:hover{text-decoration:underline}"
-           "</style>\n");
-    APPENDF("</head><body>\n<h1>Index of %s</h1>\n<hr><pre>\n", escaped_path);
+    DL_APPENDF("<!DOCTYPE html>\n<html><head><title>Index of %s</title>\n",
+               escaped_path);
+    DL_APPEND("<style>body{font-family:monospace;margin:2em}"
+              "a{text-decoration:none}a:hover{text-decoration:underline}"
+              "</style>\n");
+    DL_APPENDF("</head><body>\n<h1>Index of %s</h1>\n<hr><pre>\n",
+               escaped_path);
 
-    /* Parent directory link (unless at root) */
-    if (strcmp(url_path, "/") != 0)
-        APPEND("<a href=\"../\">../</a>\n");
+    if (strcmp(w->url_path, "/") != 0)
+        DL_APPEND("<a href=\"../\">../</a>\n");
 
     struct dirent *entry;
     while ((entry = readdir(dir)) != NULL) {
         if (strcmp(entry->d_name, ".") == 0 ||
-            strcmp(entry->d_name, "..") == 0)
-            continue;
+            strcmp(entry->d_name, "..") == 0) continue;
 
         char entry_path[TS_MAX_PATH];
         snprintf(entry_path, sizeof(entry_path), "%s/%s",
-                 fs_path, entry->d_name);
+                 w->fs_path, entry->d_name);
         struct stat st;
-        if (stat(entry_path, &st) != 0)
-            continue;
+        if (stat(entry_path, &st) != 0) continue;
 
-        /* HTML-escape the display name, URL-encode the href */
-        char escaped_name[1024];
-        char encoded_href[1024];
+        char escaped_name[1024], encoded_href[1024];
         html_escape(entry->d_name, escaped_name, sizeof(escaped_name));
         url_encode(entry->d_name, encoded_href, sizeof(encoded_href));
 
-        if (S_ISDIR(st.st_mode)) {
-            APPENDF("<a href=\"%s/\">%s/</a>\n",
-                    encoded_href, escaped_name);
-        } else {
-            APPENDF("<a href=\"%s\">%s</a>  (%lld bytes)\n",
-                     encoded_href, escaped_name, (long long)st.st_size);
-        }
+        if (S_ISDIR(st.st_mode))
+            DL_APPENDF("<a href=\"%s/\">%s/</a>\n",
+                       encoded_href, escaped_name);
+        else
+            DL_APPENDF("<a href=\"%s\">%s</a>  (%lld bytes)\n",
+                       encoded_href, escaped_name, (long long)st.st_size);
     }
 
-    APPEND("</pre><hr>\n<p>tinyserve</p>\n</body></html>\n");
+    DL_APPEND("</pre><hr>\n<p>tinyserve</p>\n</body></html>\n");
 
-#undef APPEND
-#undef APPENDF
+#undef DL_APPEND
+#undef DL_APPENDF
+#undef DL_GROW
 
     closedir(dir);
+    w->html = html;
+    w->html_len = len;
+    w->status = 200;
+}
 
-    if (is_head) {
-        ts_response_send_headers(client, 200,
-                                 "text/html; charset=utf-8", (int64_t)len,
-                                 NULL);
-        free(html);
+/* Completion callback on the loop thread. Safe to touch client. */
+static void dirlist_after_work_cb(uv_work_t *req, int status) {
+    ts_dirlist_work_t *w = req->data;
+    ts_client_t *client = w->client;
+
+    if (status == UV_ECANCELED || !client || client->closing) {
+        /* Client went away — drop the result silently. */
+        free(w->html);
+        free(w);
+        return;
+    }
+
+    /* Detach from the client (work is done). */
+    client->dirlist_work = NULL;
+
+    if (w->status != 200 || !w->html) {
+        ts_response_send(client, 500, "text/plain",
+                         "Internal Server Error", 21, NULL, w->is_head);
+    } else if (w->is_head) {
+        ts_response_send_headers(client, 200, "text/html; charset=utf-8",
+                                 (int64_t)w->html_len, NULL);
         ts_client_response_end(client);
     } else {
-        ts_response_send(client, 200,
-                         "text/html; charset=utf-8", html, len,
-                         NULL, 0);
-        free(html);
-        /* ts_response_send sets response_done */
+        ts_response_send(client, 200, "text/html; charset=utf-8",
+                         w->html, w->html_len, NULL, 0);
+    }
+
+    free(w->html);
+    free(w);
+}
+
+/* ── Send directory listing asynchronously via thread pool ── */
+static void send_directory_listing(ts_client_t *client, const char *fs_path,
+                                   const char *url_path) {
+    int is_head = (strcmp(client->req.method, "HEAD") == 0);
+
+    ts_dirlist_work_t *w = calloc(1, sizeof(*w));
+    if (!w) {
+        ts_response_send(client, 500, "text/plain",
+                         "Internal Server Error", 21, NULL, is_head);
+        return;
+    }
+    w->req.data = w;
+    w->client   = client;
+    w->is_head  = is_head;
+    snprintf(w->fs_path,  sizeof(w->fs_path),  "%s", fs_path);
+    snprintf(w->url_path, sizeof(w->url_path), "%s", url_path);
+
+    client->dirlist_work = w;
+
+    int r = uv_queue_work(client->loop, &w->req,
+                          dirlist_work_cb, dirlist_after_work_cb);
+    if (r != 0) {
+        client->dirlist_work = NULL;
+        free(w);
+        ts_response_send(client, 500, "text/plain",
+                         "Internal Server Error", 21, NULL, is_head);
     }
 }
 
@@ -546,5 +612,13 @@ void ts_file_serve(ts_client_t *client) {
         serve_file_async(client, fs_path, st.st_size);
     } else {
         ts_response_send_404(client, is_head);
+    }
+}
+
+void ts_file_serve_detach(ts_client_t *client) {
+    if (client->dirlist_work) {
+        /* after_work_cb will run on the loop thread and drop the result. */
+        client->dirlist_work->client = NULL;
+        client->dirlist_work = NULL;
     }
 }
