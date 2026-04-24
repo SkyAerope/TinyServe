@@ -26,7 +26,7 @@ Alternatively, you can download the package with dget using this command:
 
   dget -x https://mentors.debian.net/debian/pool/main/t/tinyserve/tinyserve_0.3.0-1.dsc
 
-Salsa: https://salsa.debian.org/<your-salsa-username>/tinyserve
+Salsa: https://salsa.debian.org/Derrity/tinyserve
 
 Changes since the last upload (this is the first upload):
 

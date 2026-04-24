@@ -76,7 +76,7 @@ Salsa convention: branch layout maintained by `gbp` is
 `debian/gbp.conf` with `debian-branch = debian/sid`, so:
 
 ```bash
-git remote add salsa git@salsa.debian.org:<your-username>/tinyserve.git
+git remote add salsa git@salsa.debian.org:Derrity/tinyserve.git
 git push salsa main
 git push salsa --tags
 # create the debian/sid branch from main once and push:
