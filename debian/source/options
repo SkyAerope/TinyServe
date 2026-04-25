@@ -1,0 +1,6 @@
+# Files that live in upstream git but are not part of the upstream
+# release artefact (CI manifests, downstream packaging kits, etc.).
+# Exclude them from the dpkg-source diff so packaging/CI churn does
+# not trigger "unexpected upstream changes" against the v<version>
+# git tag used to generate orig.tar.gz.
+extend-diff-ignore = "(^|/)(\.gitlab-ci\.yml|\.github|packaging|scripts/debian-release\.sh|docs/(AUR|DEBIAN)_SUBMISSION\.md)(/|$)"
