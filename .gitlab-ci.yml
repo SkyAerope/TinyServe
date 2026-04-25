@@ -1,0 +1,6 @@
+# Salsa CI uses debian/salsa-ci.yml by Debian convention. GitLab itself
+# only auto-detects .gitlab-ci.yml at the repo root, so we forward to it
+# here. (Alternatively, set Settings → CI/CD → "CI/CD configuration file"
+# to "debian/salsa-ci.yml" on salsa.)
+include:
+  - local: debian/salsa-ci.yml
