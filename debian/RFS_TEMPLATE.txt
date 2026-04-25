@@ -1,13 +1,13 @@
 From: Derrity <derrity0731@proton.me>
 To: debian-mentors@lists.debian.org
-Subject: RFS: tinyserve/0.3.0-1 [ITP] -- minimal multi-worker HTTP server built on libuv
+Subject: RFS: tinyserve/0.3.1-1 [ITP] -- minimal multi-worker HTTP server built on libuv
 
 Dear mentors,
 
 I am looking for a sponsor for my package "tinyserve":
 
  * Package name     : tinyserve
-   Version          : 0.3.0-1
+   Version          : 0.3.1-1
    Upstream contact : Derrity <derrity0731@proton.me>
  * URL              : https://github.com/Derrity/TinyServe
  * License          : MIT (Expat)
@@ -24,15 +24,15 @@ the following URL:
 
 Alternatively, you can download the package with dget using this command:
 
-  dget -x https://mentors.debian.net/debian/pool/main/t/tinyserve/tinyserve_0.3.0-1.dsc
+  dget -x https://mentors.debian.net/debian/pool/main/t/tinyserve/tinyserve_0.3.1-1.dsc
 
 Salsa: https://salsa.debian.org/Derrity/tinyserve
 
 Changes since the last upload (this is the first upload):
 
- tinyserve (0.3.0-1) unstable; urgency=medium
+ tinyserve (0.3.1-1) unstable; urgency=medium
 
-   * Initial release. (Closes: #XXXXXX)
+   * Initial release. (Closes: #1134907)
 
 QA status:
  * lintian -EvIL +pedantic --pedantic on .changes: clean
