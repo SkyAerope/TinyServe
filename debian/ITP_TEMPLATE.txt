@@ -8,7 +8,7 @@ Owner: Derrity <derrity0731@proton.me>
 X-Debbugs-Cc: debian-devel@lists.debian.org
 
 * Package name    : tinyserve
-  Version         : 0.3.0
+  Version         : 0.3.1
   Upstream Author : Derrity <derrity0731@proton.me>
 * URL             : https://github.com/Derrity/TinyServe
 * License         : MIT (Expat)
