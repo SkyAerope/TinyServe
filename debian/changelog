@@ -1,6 +1,6 @@
 tinyserve (0.3.1-1) unstable; urgency=medium
 
-  * New upstream release. (Closes: #XXXXXX)
+  * New upstream release. (Closes: #1134907)
     - Fix -Wuse-after-free in src/proxy.c write completion callback.
     - Document -j / -n CLI flags in README and README_CN.
   * Strict DEP-5 debian/copyright with per-subdirectory Files: blocks.
