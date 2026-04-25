@@ -4,6 +4,28 @@ All notable changes to TinyServe are recorded here. The format is loosely
 based on [Keep a Changelog](https://keepachangelog.com/) and the project
 adheres to [Semantic Versioning](https://semver.org/).
 
+## 0.3.1 — 2026-04-25
+
+### Added
+- AUR submission kit under `packaging/aur/` (PKGBUILD, .SRCINFO,
+  install hook) verified against `archlinux:latest` (5/5 tests pass
+  inside `makepkg -sf`, namcap PKGBUILD clean).
+- `docs/AUR_SUBMISSION.md` and `docs/DEBIAN_SUBMISSION.md`
+  operational checklists.
+- Strict DEP-5 `debian/copyright`, `debian/upstream/metadata`,
+  Salsa CI pipeline (`.gitlab-ci.yml` + `debian/salsa-ci.yml`),
+  ITP / RFS email templates, and a `scripts/debian-release.sh`
+  one-shot orig + source + lintian + piuparts + autopkgtest +
+  sbuild driver.
+
+### Fixed
+- `src/proxy.c`: clear the `write_done_cb` self-pointer before the
+  uv_close handle teardown to silence GCC `-Wuse-after-free`.
+
+### Documentation
+- README / README_CN: document the `-j` (workers) and `-n`
+  (max-connections) flags.
+
 ## 0.3.0 — 2026-01-23
 
 ### Added

@@ -8,7 +8,7 @@
 #include <stddef.h>
 #include <sys/socket.h>   /* SOMAXCONN */
 
-#define TS_VERSION "0.3.0"
+#define TS_VERSION "0.3.1"
 #define TS_MAX_HEADERS 64
 #define TS_MAX_PATH 4096
 #define TS_MAX_METHOD 16

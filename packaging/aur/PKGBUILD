@@ -1,6 +1,6 @@
 # Maintainer: Derrity <derrity0731@proton.me>
 pkgname=tinyserve
-pkgver=0.3.0
+pkgver=0.3.1
 pkgrel=1
 pkgdesc="Minimal multi-worker HTTP server built on libuv (static files + reverse proxy)"
 arch=('x86_64' 'aarch64')

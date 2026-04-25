@@ -1,3 +1,22 @@
+tinyserve (0.3.1-1) unstable; urgency=medium
+
+  * New upstream release. (Closes: #XXXXXX)
+    - Fix -Wuse-after-free in src/proxy.c write completion callback.
+    - Document -j / -n CLI flags in README and README_CN.
+  * Strict DEP-5 debian/copyright with per-subdirectory Files: blocks.
+  * Add debian/upstream/metadata for machine-readable upstream pointers.
+  * Add Salsa CI pipeline (debian/salsa-ci.yml + .gitlab-ci.yml
+    forwarder) running lintian + piuparts + autopkgtest + reprotest +
+    blhc + sbuild on every push.
+  * Add scripts/debian-release.sh: one-shot orig.tar.gz from upstream
+    git tag (debian/ stripped) + dpkg-buildpackage -F + full QA stack.
+  * Add docs/DEBIAN_SUBMISSION.md operational checklist plus
+    debian/ITP_TEMPLATE.txt and debian/RFS_TEMPLATE.txt.
+  * Switch debian/gbp.conf to upstream-tree=TAG (no pristine-tar
+    branch yet); orig is generated from the v<ver> upstream tag.
+
+ -- Derrity <derrity0731@proton.me>  Sat, 25 Apr 2026 12:00:00 +0000
+
 tinyserve (0.3.0-1) unstable; urgency=medium
 
   * Initial release. (Closes: #XXXXXX)
