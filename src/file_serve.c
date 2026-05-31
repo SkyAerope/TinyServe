@@ -192,6 +192,43 @@ static void file_read_next(ts_file_ctx_t *fctx) {
                &iov, 1, fctx->offset, on_file_read);
 }
 
+/* ── Evaluate an If-Range precondition (RFC 7233 §3.2) ──
+ * If-Range carries either an entity-tag or an HTTP-date. The Range is
+ * only honoured when that validator still matches the current
+ * representation; otherwise the client holds a stale copy and must be
+ * served the full file (200) so it does not splice old and new bytes
+ * into a corrupt result.
+ *
+ * Returns 1 if the Range may be honoured (no If-Range, or it matches),
+ * 0 if the Range must be ignored.
+ *
+ * Note: a weak validator (W/"...") must not be used for range requests,
+ * so a weak If-Range tag never matches. */
+static int if_range_matches(const char *if_range, const char *etag,
+                            time_t mtime)
+{
+    if (!if_range || !*if_range) return 1;
+
+    /* Entity-tag form: starts with '"' (strong) — must match exactly.
+     * Weak tags (W/"...") are not usable here and never match. */
+    if (if_range[0] == '"')
+        return strcmp(if_range, etag) == 0;
+    if (if_range[0] == 'W' && if_range[1] == '/')
+        return 0;
+
+    /* HTTP-date form: the Range is honoured only if the representation
+     * has not been modified since the supplied date (date >= mtime). */
+    struct tm itm;
+    memset(&itm, 0, sizeof(itm));
+    if (strptime(if_range, "%a, %d %b %Y %H:%M:%S GMT", &itm)) {
+        time_t ir_t = timegm(&itm);
+        return ir_t >= mtime;
+    }
+
+    /* Unparseable validator — be conservative and ignore the Range. */
+    return 0;
+}
+
 /* ── Async open callback — send headers then start reading ── */
 static void on_file_open(uv_fs_t *req) {
     ts_file_ctx_t *fctx = req->data;
@@ -217,6 +254,15 @@ static void on_file_open(uv_fs_t *req) {
 
     /* Parse Range header */
     const char *range_hdr = ts_request_header(&client->req, "Range");
+
+    /* RFC 7233 §3.2: a Range guarded by If-Range is only honoured while
+     * the client's validator still matches; otherwise fall back to the
+     * full representation (200) to avoid splicing stale and fresh bytes. */
+    if (range_hdr) {
+        const char *if_range = ts_request_header(&client->req, "If-Range");
+        if (!if_range_matches(if_range, fctx->etag, fctx->mtime))
+            range_hdr = NULL;
+    }
 
     if (!range_hdr) {
         /* Full file — 200 */
