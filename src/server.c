@@ -317,6 +317,12 @@ static void on_connection(uv_stream_t *server, int status) {
         return;
     }
 
+    /* Disable Nagle's algorithm: responses are assembled from several
+     * small writes (status line, headers, chunked body / multipart part
+     * headers), and coalescing them with delayed ACKs adds latency for
+     * no benefit on a request/response workload. */
+    uv_tcp_nodelay(&client->handle, 1);
+
     uv_timer_init(loop, &client->idle_timer);
     client->idle_timer.data = client;
     client->idle_timer_initialized = 1;
